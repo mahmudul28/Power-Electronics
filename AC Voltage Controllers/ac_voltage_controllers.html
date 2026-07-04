@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AC Voltage Controllers</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
+        .custom-scrollbar::-webkit-scrollbar { height: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; border-radius: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            background: #334155;
+            border-radius: 3px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: currentColor;
+            margin-top: -5px;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        .accent-blue::-webkit-slider-thumb { background: #3b82f6; }
+        .accent-red::-webkit-slider-thumb { background: #ef4444; }
+        .accent-green::-webkit-slider-thumb { background: #10b981; }
+        .accent-amber::-webkit-slider-thumb { background: #f59e0b; }
+    </style>
+</head>
+<body class="p-4 md:p-8 flex flex-col items-center min-h-screen">
+
+    <div class="w-full max-w-7xl bg-slate-800 rounded-2xl shadow-2xl border border-slate-700 overflow-hidden flex flex-col">
+        
+        <div class="p-6 border-b-4 border-indigo-500 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900">
+            <div>
+                <h1 class="text-3xl font-bold tracking-tight text-white">AC Voltage Controllers</h1>
+            </div>
+            <div class="bg-slate-800 px-5 py-3 rounded-xl border border-slate-700 shadow-inner w-full md:w-64">
+                <div class="flex justify-between gap-4 mb-2">
+                    <span class="font-semibold text-slate-400 text-xs tracking-wider uppercase">Zoom Level</span>
+                    <span class="text-indigo-400 font-bold text-sm" id="zoom-label">100%</span>
+                </div>
+                <input type="range" id="zoom-slider" min="10" max="200" step="5" value="100" class="w-full accent-blue">
+            </div>
+        </div>
+
+        <div class="p-6 bg-slate-800 border-b border-slate-700 space-y-6">
+            
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Topology / Circuit Mode</label>
+                <div class="flex flex-wrap gap-2" id="mode-container">
+                    <!-- Buttons injected via JS -->
+                </div>
+            </div>
+
+            <!-- Angle Controls -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 bg-slate-900 p-5 rounded-xl border border-slate-700">
+                
+                <div class="flex flex-col">
+                    <div class="flex justify-between mb-2">
+                        <span class="font-semibold text-sm text-slate-300" id="label-alphaA">Firing Angle (α)</span>
+                        <span class="text-red-400 font-bold" id="val-alphaA">60°</span>
+                    </div>
+                    <input type="range" id="slider-alphaA" min="0" max="180" step="1" value="60" class="w-full accent-red">
+                </div>
+
+                <div class="flex flex-col transition-opacity duration-300" id="container-alphaB">
+                    <div class="flex justify-between mb-2">
+                        <span class="font-semibold text-sm text-slate-300">Phase B Firing (α_B)</span>
+                        <span class="text-blue-400 font-bold" id="val-alphaB">60°</span>
+                    </div>
+                    <input type="range" id="slider-alphaB" min="0" max="180" step="1" value="60" class="w-full accent-blue">
+                </div>
+
+                <div class="flex flex-col transition-opacity duration-300" id="container-alphaC">
+                    <div class="flex justify-between mb-2">
+                        <span class="font-semibold text-sm text-slate-300">Phase C Firing (α_C)</span>
+                        <span class="text-emerald-400 font-bold" id="val-alphaC">60°</span>
+                    </div>
+                    <input type="range" id="slider-alphaC" min="0" max="180" step="1" value="60" class="w-full accent-green">
+                </div>
+
+                <div class="flex flex-col justify-center border-l-2 pl-6 border-slate-700 min-h-[50px]">
+                    <label class="flex items-center gap-3 cursor-pointer p-2 hover:bg-slate-800 rounded-lg transition-colors" id="container-unlink">
+                        <input type="checkbox" id="check-unlink" class="w-5 h-5 accent-indigo-500 rounded cursor-pointer">
+                        <span class="text-sm font-bold text-slate-300 tracking-wide uppercase">Unlink Phases</span>
+                    </label>
+
+                    <div id="container-rl" class="flex-col w-full hidden">
+                        <div class="flex justify-between mb-2">
+                            <span class="font-semibold text-sm text-amber-500">Load Angle (θ)</span>
+                            <span class="text-amber-400 font-bold" id="val-theta">45°</span>
+                        </div>
+                        <input type="range" id="slider-theta" min="0" max="90" step="1" value="45" class="w-full accent-amber">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="w-full bg-slate-900 overflow-x-auto p-4 custom-scrollbar text-center">
+            <div id="svg-wrapper" style="margin: 0 auto; width: 100%; min-width: 800px; transition: width 0.2s ease-out, min-width 0.2s ease-out;">
+                <!-- SVGs injected via JS -->
+            </div>
+        </div>
+        
+        <!-- 13. Name at bottom right, simple -->
+        <div class="bg-slate-900 text-right p-4 text-slate-500 font-medium text-sm rounded-b-2xl">
+            Mahmudul Hasan (2202156)
+        </div>
+    </div>
+
+    <script>
+        const MODES = [
+            { id: '1p-hw', label: '1Φ Half-Wave (Phase Control)' },
+            { id: '1p-fw', label: '1Φ Full-Wave (R Load)' },
+            { id: '1p-rl', label: '1Φ Full-Wave (RL Load)' },
+            { id: '3p-fw-wye', label: '3Φ Full-Wave (Wye)' },
+            { id: '3p-hw-std', label: '3Φ Half-Wave (Std Wye)' },
+            { id: '3p-hw-rev', label: '3Φ Half-Wave (Rev Wye)' },
+            { id: '3p-delta', label: '3Φ Full-Wave (Delta)' }
+        ];
+
+        const state = {
+            mode: '3p-fw-wye',
+            linked: true,
+            alphaA: 60,
+            alphaB: 60,
+            alphaC: 60,
+            theta: 45,
+            zoom: 100
+        };
+
+        // 3. Mention 0, pie/2, pie, etc
+        const TICK_MARKS = [
+            { x: 0, label: '0' },
+            { x: 90, label: 'π/2' },
+            { x: 180, label: 'π' },
+            { x: 270, label: '3π/2' },
+            { x: 360, label: '2π' }
+        ];
+
+        const el = {
+            modeContainer: document.getElementById('mode-container'),
+            zoomSlider: document.getElementById('zoom-slider'),
+            zoomLabel: document.getElementById('zoom-label'),
+            sliderA: document.getElementById('slider-alphaA'),
+            sliderB: document.getElementById('slider-alphaB'),
+            sliderC: document.getElementById('slider-alphaC'),
+            sliderTheta: document.getElementById('slider-theta'),
+            valA: document.getElementById('val-alphaA'),
+            valB: document.getElementById('val-alphaB'),
+            valC: document.getElementById('val-alphaC'),
+            valTheta: document.getElementById('val-theta'),
+            labelA: document.getElementById('label-alphaA'),
+            contB: document.getElementById('container-alphaB'),
+            contC: document.getElementById('container-alphaC'),
+            contUnlink: document.getElementById('container-unlink'),
+            checkUnlink: document.getElementById('check-unlink'),
+            contRL: document.getElementById('container-rl'),
+            wrapper: document.getElementById('svg-wrapper')
+        };
+
+        const toRad = (deg) => (deg * Math.PI) / 180;
+
+        const isOn = (deg, start, dur) => {
+            if (dur <= 0) return false;
+            const end = start + dur;
+            const sMod = start % 360;
+            const eMod = end % 360;
+            const dMod = deg % 360;
+            if (sMod <= eMod) return dMod >= sMod && dMod < eMod;
+            return dMod >= sMod || dMod < eMod;
+        };
+
+        const solveRL = (alpha, theta) => {
+            if (alpha <= theta) return alpha + 180;
+            const aRad = toRad(alpha);
+            const tRad = toRad(theta);
+            for (let i = alpha + 1; i <= alpha + 240; i++) {
+                const w = toRad(i);
+                const cur = Math.sin(w - tRad) - Math.sin(aRad - tRad) * Math.exp(-(w - aRad) / Math.tan(tRad));
+                if (cur <= 0) return i;
+            }
+            return alpha + 180;
+        };
+
+        const formatText = (text) => {
+            return text.replace(/_([a-zA-Z0-9]+)/g, '<tspan font-size="0.7em" dy="4">$1</tspan><tspan dy="-4"></tspan>');
+        };
+
+        const buildWaveChart = (title, data, lines, height = 140, center = 70, scale = 45) => {
+            let svg = `<svg viewBox="0 0 360 ${height}" class="w-full h-auto overflow-visible mb-8 block text-left" style="min-height: ${height}px;">`;
+            
+            TICK_MARKS.forEach(t => {
+                svg += `<line x1="${t.x}" y1="0" x2="${t.x}" y2="${height}" stroke="#334155" stroke-dasharray="2 2" stroke-width="0.5"/>`;
+                if(t.x > 0) {
+                    svg += `<text x="${t.x + 2}" y="${height - 4}" fill="#64748b" font-size="9" font-weight="500" font-family="sans-serif">${t.label}</text>`;
+                }
+            });
+            svg += `<text x="2" y="${height - 4}" fill="#64748b" font-size="9" font-weight="500" font-family="sans-serif">0</text>`;
+
+            svg += `<line x1="0" y1="${center}" x2="360" y2="${center}" stroke="#475569" stroke-width="1"/>`;
+            svg += `<text x="0" y="15" fill="#cbd5e1" font-size="12" font-weight="bold" font-family="sans-serif">${formatText(title)}</text>`;
+
+            // 4. Mention who is Vab, Vbc etc (Legends at top right)
+            let legX = 350;
+            [...lines].reverse().forEach(line => {
+                if(line.name) {
+                    legX -= 35;
+                    svg += `<text x="${legX + 12}" y="15" fill="${line.color}" font-size="11" font-weight="bold" font-family="sans-serif">${formatText(line.name)}</text>`;
+                    svg += `<line x1="${legX}" y1="12" x2="${legX + 8}" y2="12" stroke="${line.color}" stroke-width="2" ${line.dash ? `stroke-dasharray="${line.dash}"` : ''}/>`;
+                }
+            });
+
+            lines.forEach(line => {
+                if (!data.length) return;
+                let d = `M 0 ${center - (data[0][line.key] || 0) * scale}`;
+                for (let i = 1; i <= 360; i++) {
+                    const val = data[i][line.key] || 0;
+                    const prevVal = data[i - 1][line.key] || 0;
+                    const y = center - val * scale;
+                    const prevY = center - prevVal * scale;
+                    
+                    if (Math.abs(y - prevY) > scale * 0.15) {
+                        d += ` L ${i} ${prevY}`;
+                    }
+                    d += ` L ${i} ${y}`;
+                }
+                
+                if (line.fill) {
+                    svg += `<path d="${d} L 360 ${center} L 0 ${center} Z" fill="${line.fill}" />`;
+                }
+                svg += `<path d="${d}" fill="none" stroke="${line.color}" stroke-width="${line.width || 1.5}" ${line.dash ? `stroke-dasharray="${line.dash}"` : ''} stroke-linejoin="round" />`;
+            });
+            svg += `</svg>`;
+            return svg;
+        };
+
+        const getBlocks = (data, key) => {
+            const blocks = [];
+            let start = null;
+            for (let i = 0; i <= 360; i++) {
+                if (data[i][key] && start === null) start = i;
+                if (!data[i][key] && start !== null) {
+                    blocks.push({ s: start, e: i });
+                    start = null;
+                }
+            }
+            if (start !== null) blocks.push({ s: start, e: 360 });
+            return blocks;
+        };
+
+        const buildGanttChart = (data, devices) => {
+            const rowHeight = 22;
+            const height = devices.length * rowHeight + 35;
+            let svg = `<svg viewBox="0 0 360 ${height}" class="w-full h-auto overflow-visible mb-8 block text-left" style="min-height: ${height}px;">`;
+            
+            TICK_MARKS.forEach(t => {
+                svg += `<line x1="${t.x}" y1="0" x2="${t.x}" y2="${height}" stroke="#334155" stroke-dasharray="2 2" stroke-width="0.5"/>`;
+            });
+            
+            svg += `<text x="0" y="15" fill="#cbd5e1" font-size="12" font-weight="bold" font-family="sans-serif">Device Conduction Sequence</text>`;
+
+            devices.forEach((dev, idx) => {
+                const y = idx * rowHeight + 25;
+                svg += `<text x="0" y="${y + 11}" fill="${dev.color}" font-size="9" font-weight="bold" font-family="sans-serif">${formatText(dev.label)}</text>`;
+                const blocks = getBlocks(data, dev.key);
+                blocks.forEach(b => {
+                    svg += `<rect x="${b.s}" y="${y}" width="${b.e - b.s}" height="14" fill="${dev.color}" opacity="0.85" rx="2" />`;
+                });
+            });
+            svg += `</svg>`;
+            return svg;
+        };
+
+        const computeData = () => {
+            const arr = [];
+            const is3P = state.mode.startsWith('3p');
+            
+            const aA = state.alphaA;
+            const aB = state.linked ? aA : state.alphaB;
+            const aC = state.linked ? aA : state.alphaC;
+
+            let betaA = 180, betaB = 180;
+            if (state.mode === '1p-rl') {
+                betaA = solveRL(aA, state.theta);
+                betaB = solveRL(aA + 180, state.theta);
+            }
+
+            for (let i = 0; i <= 360; i++) {
+                const rad = toRad(i);
+                const pt = { deg: i, vA: Math.sin(rad) };
+                
+                if (is3P) {
+                    pt.vB = Math.sin(rad - toRad(120));
+                    pt.vC = Math.sin(rad - toRad(240));
+                    pt.vAB = pt.vA - pt.vB;
+                    pt.vBC = pt.vB - pt.vC;
+                    pt.vCA = pt.vC - pt.vA;
+                }
+
+                if (state.mode === '1p-hw') {
+                    pt.t1 = i >= aA && i <= 180;
+                    pt.voA = pt.t1 ? pt.vA : 0;
+                    pt.vt1 = pt.t1 ? 0 : pt.vA;
+                } 
+                else if (state.mode === '1p-fw') {
+                    pt.t1 = i >= aA && i <= 180;
+                    pt.t2 = i >= aA + 180 && i <= 360;
+                    pt.voA = (pt.t1 || pt.t2) ? pt.vA : 0;
+                    pt.vt1 = (pt.t1 || pt.t2) ? 0 : pt.vA;
+                } 
+                else if (state.mode === '1p-rl') {
+                    pt.t1 = isOn(i, aA, betaA - aA);
+                    pt.t2 = isOn(i, aA + 180, betaB - (aA + 180));
+                    pt.voA = (pt.t1 || pt.t2) ? pt.vA : 0;
+                    pt.vt1 = (pt.t1 || pt.t2) ? 0 : pt.vA;
+                } 
+                else if (state.mode === '3p-delta') {
+                    pt.t1 = isOn(i, aA, 180 - aA);       pt.t4 = isOn(i, aA + 180, 180 - aA); 
+                    pt.t3 = isOn(i, aB + 120, 180 - aB); pt.t6 = isOn(i, aB + 300, 180 - aB); 
+                    pt.t5 = isOn(i, aC + 240, 180 - aC); pt.t2 = isOn(i, aC + 60,  180 - aC); 
+
+                    pt.voA = (pt.t1 || pt.t4) ? pt.vAB : 0; 
+                    pt.voB = (pt.t3 || pt.t6) ? pt.vBC : 0; 
+                    pt.voC = (pt.t5 || pt.t2) ? pt.vCA : 0; 
+                    pt.vt1 = (pt.t1 || pt.t4) ? 0 : pt.vAB;
+                } 
+                else {
+                    let t1=false, t2=false, t3=false, t4=false, t5=false, t6=false;
+                    let d1=false, d2=false, d3=false, d4=false, d5=false, d6=false;
+
+                    if (state.mode === '3p-fw-wye') {
+                        t1 = isOn(i, aA, 180 - aA);       t4 = isOn(i, aA + 180, 180 - aA);
+                        t3 = isOn(i, aB + 120, 180 - aB); t6 = isOn(i, aB + 300, 180 - aB);
+                        t5 = isOn(i, aC + 240, 180 - aC); t2 = isOn(i, aC + 60, 180 - aC);
+                    } else if (state.mode === '3p-hw-std') {
+                        t1 = isOn(i, aA, 180 - aA);
+                        t3 = isOn(i, aB + 120, 180 - aB);
+                        t5 = isOn(i, aC + 240, 180 - aC);
+                        d4 = isOn(i, 180, 180); 
+                        d6 = isOn(i, 300, 180); 
+                        d2 = isOn(i, 60, 180);  
+                    } else if (state.mode === '3p-hw-rev') {
+                        d1 = isOn(i, 0, 180);   
+                        d3 = isOn(i, 120, 180); 
+                        d5 = isOn(i, 240, 180); 
+                        t4 = isOn(i, aA + 180, 180 - aA);
+                        t6 = isOn(i, aB + 300, 180 - aB);
+                        t2 = isOn(i, aC + 60, 180 - aC);
+                    }
+
+                    const pA = t1 || d1 || t4 || d4;
+                    const pB = t3 || d3 || t6 || d6;
+                    const pC = t5 || d5 || t2 || d2;
+                    const count = (pA?1:0) + (pB?1:0) + (pC?1:0);
+                    
+                    const Vn = count > 0 ? ((pA?pt.vA:0) + (pB?pt.vB:0) + (pC?pt.vC:0)) / count : 0;
+                    
+                    pt.voA = pA ? pt.vA - Vn : 0;
+                    pt.voB = pB ? pt.vB - Vn : 0;
+                    pt.voC = pC ? pt.vC - Vn : 0;
+                    pt.vt1 = pA ? 0 : pt.vA - Vn;
+
+                    Object.assign(pt, {t1, t2, t3, t4, t5, t6, d1, d2, d3, d4, d5, d6});
+                }
+                arr.push(pt);
+            }
+            return arr;
+        };
+
+        const render = () => {
+            const is3P = state.mode.startsWith('3p');
+            
+            el.modeContainer.innerHTML = MODES.map(m => `
+                <button data-mode="${m.id}" class="px-4 py-2 text-sm font-semibold rounded-lg transition-all ${state.mode === m.id ? 'bg-indigo-600 text-white shadow-lg scale-105' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}">${m.label}</button>
+            `).join('');
+
+            document.querySelectorAll('#mode-container button').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    state.mode = e.target.dataset.mode;
+                    render();
+                });
+            });
+
+            if (is3P) {
+                el.contUnlink.style.display = 'flex';
+                el.contRL.style.display = 'none';
+                el.labelA.innerText = state.linked ? "Firing Angle (α)" : "Phase A Firing (α_A)";
+                el.contB.style.opacity = state.linked ? '0.3' : '1';
+                el.contC.style.opacity = state.linked ? '0.3' : '1';
+                el.contB.style.pointerEvents = state.linked ? 'none' : 'auto';
+                el.contC.style.pointerEvents = state.linked ? 'none' : 'auto';
+            } else {
+                el.contUnlink.style.display = 'none';
+                el.contRL.style.display = state.mode === '1p-rl' ? 'flex' : 'none';
+                el.labelA.innerText = "Firing Angle (α)";
+                el.contB.style.opacity = '0';
+                el.contC.style.opacity = '0';
+                el.contB.style.pointerEvents = 'none';
+                el.contC.style.pointerEvents = 'none';
+            }
+
+            if (state.linked) {
+                state.alphaB = state.alphaA;
+                state.alphaC = state.alphaA;
+                el.sliderB.value = state.alphaA;
+                el.sliderC.value = state.alphaA;
+            }
+
+            el.valA.innerText = state.alphaA + '°';
+            el.valB.innerText = state.alphaB + '°';
+            el.valC.innerText = state.alphaC + '°';
+            el.valTheta.innerText = state.theta + '°';
+
+            const data = computeData();
+            let svgsHTML = "";
+
+            // 1. Reference Separated (Phase and Line)
+            if (is3P) {
+                const phaseLines = [
+                    { key: 'vA', color: '#ef4444', width: 2, name: 'v_an' },
+                    { key: 'vB', color: '#3b82f6', width: 2, name: 'v_bn' },
+                    { key: 'vC', color: '#10b981', width: 2, name: 'v_cn' }
+                ];
+                svgsHTML += buildWaveChart("Phase Voltages", data, phaseLines, 140, 70, 45);
+
+                const lineLines = [
+                    { key: 'vAB', color: '#fca5a5', width: 2, name: 'v_ab', dash: '4 4' },
+                    { key: 'vBC', color: '#93c5fd', width: 2, name: 'v_bc', dash: '4 4' },
+                    { key: 'vCA', color: '#6ee7b7', width: 2, name: 'v_ca', dash: '4 4' }
+                ];
+                // Line voltages are 1.732x taller, need more height
+                svgsHTML += buildWaveChart("Line Voltages", data, lineLines, 180, 90, 45);
+            } else {
+                const refLines = [{ key: 'vA', color: '#ef4444', width: 2, name: 'v_s' }];
+                svgsHTML += buildWaveChart("Source Voltage", data, refLines, 140, 70, 45);
+            }
+
+            // 2. Conduction Devices (FIXED BRACKETS)
+            let devs = [];
+            if (!is3P) {
+                devs = [{ key: 't1', label: 'T_1', color: '#ef4444' }];
+                if (state.mode !== '1p-hw') devs.push({ key: 't2', label: 'T_2', color: '#3b82f6' });
+            } else {
+                if (state.mode === '3p-hw-std') {
+                    devs = [
+                        { key: 't1', label: 'T_1 (A+)', color: '#ef4444' },
+                        { key: 't3', label: 'T_3 (B+)', color: '#3b82f6' },
+                        { key: 't5', label: 'T_5 (C+)', color: '#10b981' },
+                        { key: 'd4', label: 'D_4 (A-)', color: '#fca5a5' },
+                        { key: 'd6', label: 'D_6 (B-)', color: '#93c5fd' },
+                        { key: 'd2', label: 'D_2 (C-)', color: '#6ee7b7' }
+                    ];
+                } else if (state.mode === '3p-hw-rev') {
+                    devs = [
+                        { key: 't4', label: 'T_4 (A-)', color: '#ef4444' },
+                        { key: 't6', label: 'T_6 (B-)', color: '#3b82f6' },
+                        { key: 't2', label: 'T_2 (C-)', color: '#10b981' },
+                        { key: 'd1', label: 'D_1 (A+)', color: '#fca5a5' },
+                        { key: 'd3', label: 'D_3 (B+)', color: '#93c5fd' },
+                        { key: 'd5', label: 'D_5 (C+)', color: '#6ee7b7' }
+                    ];
+                } else {
+                    devs = [
+                        { key: 't1', label: 'T_1 (A+)', color: '#ef4444' },
+                        { key: 't3', label: 'T_3 (B+)', color: '#3b82f6' },
+                        { key: 't5', label: 'T_5 (C+)', color: '#10b981' },
+                        { key: 't4', label: 'T_4 (A-)', color: '#fca5a5' },
+                        { key: 't6', label: 'T_6 (B-)', color: '#93c5fd' },
+                        { key: 't2', label: 'T_2 (C-)', color: '#6ee7b7' }
+                    ];
+                }
+            }
+            svgsHTML += buildGanttChart(data, devs);
+
+            // 3. Outputs
+            const outATitle = is3P && state.mode === '3p-delta' ? 'v_ab' : 'v_an';
+            svgsHTML += buildWaveChart(`Output Phase A`, data, [{ key: 'voA', color: '#ef4444', fill: 'rgba(239, 68, 68, 0.15)', width: 2.5, name: outATitle }]);
+
+            if (is3P) {
+                const outBTitle = state.mode === '3p-delta' ? 'v_bc' : 'v_bn';
+                const outCTitle = state.mode === '3p-delta' ? 'v_ca' : 'v_cn';
+                svgsHTML += buildWaveChart(`Output Phase B`, data, [{ key: 'voB', color: '#3b82f6', fill: 'rgba(59, 130, 246, 0.15)', width: 2.5, name: outBTitle }]);
+                svgsHTML += buildWaveChart(`Output Phase C`, data, [{ key: 'voC', color: '#10b981', fill: 'rgba(16, 185, 129, 0.15)', width: 2.5, name: outCTitle }]);
+            }
+
+            // 4. Thyristor Voltage
+            svgsHTML += buildWaveChart("Voltage Across Phase A Switch", data, [{ key: 'vt1', color: '#94a3b8', fill: 'rgba(148, 163, 184, 0.1)', name: 'v_T1' }]);
+
+            el.wrapper.innerHTML = svgsHTML;
+        };
+
+        el.sliderA.addEventListener('input', e => { state.alphaA = parseInt(e.target.value); render(); });
+        el.sliderB.addEventListener('input', e => { state.alphaB = parseInt(e.target.value); render(); });
+        el.sliderC.addEventListener('input', e => { state.alphaC = parseInt(e.target.value); render(); });
+        el.sliderTheta.addEventListener('input', e => { state.theta = parseInt(e.target.value); render(); });
+        
+        el.zoomSlider.addEventListener('input', e => {
+            state.zoom = parseInt(e.target.value);
+            el.zoomLabel.innerText = state.zoom + '%';
+            el.wrapper.style.width = `${state.zoom}%`;
+            // Centered zoom out logic
+            if (state.zoom < 100) {
+                el.wrapper.style.minWidth = '0px'; 
+            } else {
+                el.wrapper.style.minWidth = `${state.zoom * 8}px`; 
+            }
+        });
+
+        el.checkUnlink.addEventListener('change', e => {
+            state.linked = !e.target.checked;
+            render();
+        });
+
+        // Initialize App
+        render();
+
+    </script>
+</body>
+</html>
