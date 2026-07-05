@@ -142,15 +142,6 @@
             zoom: 100
         };
 
-        // 3. Mention 0, pie/2, pie, etc
-        const TICK_MARKS = [
-            { x: 0, label: '0' },
-            { x: 90, label: 'π/2' },
-            { x: 180, label: 'π' },
-            { x: 270, label: '3π/2' },
-            { x: 360, label: '2π' }
-        ];
-
         const el = {
             modeContainer: document.getElementById('mode-container'),
             zoomSlider: document.getElementById('zoom-slider'),
@@ -201,21 +192,29 @@
         };
 
         const buildWaveChart = (title, data, lines, height = 140, center = 70, scale = 45) => {
-            let svg = `<svg viewBox="0 0 360 ${height}" class="w-full h-auto overflow-visible mb-8 block text-left" style="min-height: ${height}px;">`;
+            let svg = `<svg viewBox="0 0 540 ${height}" class="w-full h-auto overflow-visible mb-8 block text-left" style="min-height: ${height}px;">`;
             
-            TICK_MARKS.forEach(t => {
-                svg += `<line x1="${t.x}" y1="0" x2="${t.x}" y2="${height}" stroke="#334155" stroke-dasharray="2 2" stroke-width="0.5"/>`;
-                if(t.x > 0) {
-                    svg += `<text x="${t.x + 2}" y="${height - 4}" fill="#64748b" font-size="9" font-weight="500" font-family="sans-serif">${t.label}</text>`;
+            // Loop for 30 deg dotted lines and π/2 interval labels up to 3π (540 degrees)
+            for(let deg = 0; deg <= 540; deg += 30) {
+                svg += `<line x1="${deg}" y1="0" x2="${deg}" y2="${height}" stroke="#334155" stroke-dasharray="2 2" stroke-width="0.5"/>`;
+                if(deg % 90 === 0) {
+                    let label = '';
+                    if (deg === 0) label = '0';
+                    else if (deg === 90) label = 'π/2';
+                    else if (deg === 180) label = 'π';
+                    else if (deg === 270) label = '3π/2';
+                    else if (deg === 360) label = '2π';
+                    else if (deg === 450) label = '5π/2';
+                    else if (deg === 540) label = '3π';
+                    
+                    svg += `<text x="${deg === 0 ? 2 : deg + 2}" y="${height - 4}" fill="#64748b" font-size="9" font-weight="500" font-family="sans-serif">${label}</text>`;
                 }
-            });
-            svg += `<text x="2" y="${height - 4}" fill="#64748b" font-size="9" font-weight="500" font-family="sans-serif">0</text>`;
+            }
 
-            svg += `<line x1="0" y1="${center}" x2="360" y2="${center}" stroke="#475569" stroke-width="1"/>`;
+            svg += `<line x1="0" y1="${center}" x2="540" y2="${center}" stroke="#475569" stroke-width="1"/>`;
             svg += `<text x="0" y="15" fill="#cbd5e1" font-size="12" font-weight="bold" font-family="sans-serif">${formatText(title)}</text>`;
 
-            // 4. Mention who is Vab, Vbc etc (Legends at top right)
-            let legX = 350;
+            let legX = 530;
             [...lines].reverse().forEach(line => {
                 if(line.name) {
                     legX -= 35;
@@ -227,7 +226,7 @@
             lines.forEach(line => {
                 if (!data.length) return;
                 let d = `M 0 ${center - (data[0][line.key] || 0) * scale}`;
-                for (let i = 1; i <= 360; i++) {
+                for (let i = 1; i <= 540; i++) {
                     const val = data[i][line.key] || 0;
                     const prevVal = data[i - 1][line.key] || 0;
                     const y = center - val * scale;
@@ -240,7 +239,7 @@
                 }
                 
                 if (line.fill) {
-                    svg += `<path d="${d} L 360 ${center} L 0 ${center} Z" fill="${line.fill}" />`;
+                    svg += `<path d="${d} L 540 ${center} L 0 ${center} Z" fill="${line.fill}" />`;
                 }
                 svg += `<path d="${d}" fill="none" stroke="${line.color}" stroke-width="${line.width || 1.5}" ${line.dash ? `stroke-dasharray="${line.dash}"` : ''} stroke-linejoin="round" />`;
             });
@@ -251,25 +250,25 @@
         const getBlocks = (data, key) => {
             const blocks = [];
             let start = null;
-            for (let i = 0; i <= 360; i++) {
-                if (data[i][key] && start === null) start = i;
-                if (!data[i][key] && start !== null) {
+            for (let i = 0; i <= 540; i++) {
+                if (data[i] && data[i][key] && start === null) start = i;
+                if (data[i] && !data[i][key] && start !== null) {
                     blocks.push({ s: start, e: i });
                     start = null;
                 }
             }
-            if (start !== null) blocks.push({ s: start, e: 360 });
+            if (start !== null) blocks.push({ s: start, e: 540 });
             return blocks;
         };
 
         const buildGanttChart = (data, devices) => {
             const rowHeight = 22;
             const height = devices.length * rowHeight + 35;
-            let svg = `<svg viewBox="0 0 360 ${height}" class="w-full h-auto overflow-visible mb-8 block text-left" style="min-height: ${height}px;">`;
+            let svg = `<svg viewBox="0 0 540 ${height}" class="w-full h-auto overflow-visible mb-8 block text-left" style="min-height: ${height}px;">`;
             
-            TICK_MARKS.forEach(t => {
-                svg += `<line x1="${t.x}" y1="0" x2="${t.x}" y2="${height}" stroke="#334155" stroke-dasharray="2 2" stroke-width="0.5"/>`;
-            });
+            for(let deg = 0; deg <= 540; deg += 30) {
+                svg += `<line x1="${deg}" y1="0" x2="${deg}" y2="${height}" stroke="#334155" stroke-dasharray="2 2" stroke-width="0.5"/>`;
+            }
             
             svg += `<text x="0" y="15" fill="#cbd5e1" font-size="12" font-weight="bold" font-family="sans-serif">Device Conduction Sequence</text>`;
 
@@ -299,7 +298,8 @@
                 betaB = solveRL(aA + 180, state.theta);
             }
 
-            for (let i = 0; i <= 360; i++) {
+            // Loop extended to 540 (3π)
+            for (let i = 0; i <= 540; i++) {
                 const rad = toRad(i);
                 const pt = { deg: i, vA: Math.sin(rad) };
                 
@@ -428,7 +428,6 @@
             const data = computeData();
             let svgsHTML = "";
 
-            // 1. Reference Separated (Phase and Line)
             if (is3P) {
                 const phaseLines = [
                     { key: 'vA', color: '#ef4444', width: 2, name: 'v_an' },
@@ -442,14 +441,12 @@
                     { key: 'vBC', color: '#93c5fd', width: 2, name: 'v_bc', dash: '4 4' },
                     { key: 'vCA', color: '#6ee7b7', width: 2, name: 'v_ca', dash: '4 4' }
                 ];
-                // Line voltages are 1.732x taller, need more height
                 svgsHTML += buildWaveChart("Line Voltages", data, lineLines, 180, 90, 45);
             } else {
                 const refLines = [{ key: 'vA', color: '#ef4444', width: 2, name: 'v_s' }];
                 svgsHTML += buildWaveChart("Source Voltage", data, refLines, 140, 70, 45);
             }
 
-            // 2. Conduction Devices (FIXED BRACKETS)
             let devs = [];
             if (!is3P) {
                 devs = [{ key: 't1', label: 'T_1', color: '#ef4444' }];
@@ -486,7 +483,6 @@
             }
             svgsHTML += buildGanttChart(data, devs);
 
-            // 3. Outputs
             const outATitle = is3P && state.mode === '3p-delta' ? 'v_ab' : 'v_an';
             svgsHTML += buildWaveChart(`Output Phase A`, data, [{ key: 'voA', color: '#ef4444', fill: 'rgba(239, 68, 68, 0.15)', width: 2.5, name: outATitle }]);
 
@@ -497,7 +493,6 @@
                 svgsHTML += buildWaveChart(`Output Phase C`, data, [{ key: 'voC', color: '#10b981', fill: 'rgba(16, 185, 129, 0.15)', width: 2.5, name: outCTitle }]);
             }
 
-            // 4. Thyristor Voltage
             svgsHTML += buildWaveChart("Voltage Across Phase A Switch", data, [{ key: 'vt1', color: '#94a3b8', fill: 'rgba(148, 163, 184, 0.1)', name: 'v_T1' }]);
 
             el.wrapper.innerHTML = svgsHTML;
@@ -512,7 +507,6 @@
             state.zoom = parseInt(e.target.value);
             el.zoomLabel.innerText = state.zoom + '%';
             el.wrapper.style.width = `${state.zoom}%`;
-            // Centered zoom out logic
             if (state.zoom < 100) {
                 el.wrapper.style.minWidth = '0px'; 
             } else {
