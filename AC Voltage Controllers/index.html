@@ -7,7 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* Color Palette Variables matching the advanced theme */
         :root {
             --bg-deep: #050505;
             --bg-glow: #0a0f1c;
@@ -33,23 +32,24 @@
         }
 
         .active-btn {
-            background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2));
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(168, 85, 247, 0.25));
             border-color: #a855f7;
-            box-shadow: 0 0 15px rgba(168, 85, 247, 0.3), inset 0 0 10px rgba(99, 102, 241, 0.2);
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.4), inset 0 0 12px rgba(99, 102, 241, 0.3);
             color: #fff;
+            transform: scale(1.02);
         }
 
         .inactive-btn {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.03);
             border-color: rgba(255, 255, 255, 0.05);
             color: #94a3b8;
         }
+        
         .inactive-btn:hover {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.08);
             color: #fff;
         }
 
-        /* Seamless iframe integration */
         iframe {
             background: transparent;
             color-scheme: dark;
@@ -58,38 +58,40 @@
 </head>
 <body class="flex flex-col h-screen">
 
-    <!-- Mobile-Only Desktop Site Warning -->
-    <div class="md:hidden bg-amber-500/10 border-b border-amber-500/20 text-amber-500 text-[11px] font-bold uppercase tracking-widest text-center py-2 px-4 shadow-[0_4px_15px_rgba(245,158,11,0.1)] z-50 flex items-center justify-center gap-2">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
-        For the best experience, turn on "Desktop Site"
+    <!-- Mobile-Only Desktop Site Warning (Highly Visible) -->
+    <div class="md:hidden bg-gradient-to-r from-amber-600 to-orange-500 text-white text-xs sm:text-sm font-bold uppercase tracking-wider text-center py-3 px-4 shadow-[0_4px_20px_rgba(245,158,11,0.3)] z-50 flex items-center justify-center gap-2">
+        <svg class="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+        </svg>
+        <span>Important: Turn on "Desktop Site" for the best experience!</span>
     </div>
 
-    <header class="glass-panel p-4 md:p-5 flex flex-col md:flex-row justify-between items-center z-20 m-0 border-x-0 border-t-0 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
-        <div class="mb-4 md:mb-0">
-            <h1 class="text-xl md:text-2xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 flex items-center gap-3">
-                <span class="bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 px-2.5 py-1 rounded text-xs uppercase tracking-widest shadow-[inset_0_0_10px_rgba(99,102,241,0.2)]">Chapter</span>
+    <header class="glass-panel p-4 md:p-6 flex flex-col xl:flex-row justify-between items-center z-20 m-0 border-x-0 border-t-0 shadow-[0_10px_30px_rgba(0,0,0,0.5)] gap-4">
+        <div class="w-full xl:w-auto flex justify-center xl:justify-start">
+            <h1 class="text-2xl md:text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 flex items-center gap-3">
+                <span class="bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 px-3 py-1.5 rounded-lg text-xs md:text-sm uppercase tracking-widest shadow-[inset_0_0_10px_rgba(99,102,241,0.2)]">Chapter</span>
                 AC Voltage Controllers
             </h1>
         </div>
         
-        <div class="flex space-x-2 bg-black/40 p-1.5 rounded-xl border border-white/5 shadow-inner">
-            <button id="btn-ac" class="px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 border active-btn scale-[1.02]">
+        <!-- Larger, more prominent selection buttons -->
+        <div class="flex space-x-3 bg-black/40 p-2 rounded-2xl border border-white/5 shadow-inner w-full sm:w-auto justify-center">
+            <button id="btn-ac" class="px-6 py-3 md:px-8 md:py-3.5 rounded-xl text-sm md:text-base font-bold transition-all duration-300 border active-btn flex-1 sm:flex-none">
                 Standard Controllers
             </button>
-            <button id="btn-cyclo" class="px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 border inactive-btn">
+            <button id="btn-cyclo" class="px-6 py-3 md:px-8 md:py-3.5 rounded-xl text-sm md:text-base font-bold transition-all duration-300 border inactive-btn flex-1 sm:flex-none">
                 Cycloconverters
             </button>
         </div>
     </header>
 
     <main class="flex-1 w-full relative z-10">
-        <!-- Update the src attributes in the script below if your file names differ -->
+        <!-- Make sure these src filenames exactly match your actual HTML files -->
         <iframe id="sim-frame" src="ac_controller.html" class="w-full h-full border-none absolute top-0 left-0 transition-opacity duration-300"></iframe>
     </main>
 
     <script>
-        // Note: Change these filenames if your advanced HTML files are named differently 
-        // (e.g., 'ac_voltage_controllers_advanced.html' & 'cycloconverter_advanced.html')
+        // File paths for the two simulators
         const FILE_AC = 'ac_controller.html';
         const FILE_CYCLO = 'cycloconverter.html';
 
@@ -97,27 +99,42 @@
         const btnCyclo = document.getElementById('btn-cyclo');
         const frame = document.getElementById('sim-frame');
 
-        const activeClass = 'px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 border active-btn scale-[1.02]';
-        const inactiveClass = 'px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 border inactive-btn';
+        // Classes for the button states
+        const activeClass = 'px-6 py-3 md:px-8 md:py-3.5 rounded-xl text-sm md:text-base font-bold transition-all duration-300 border active-btn flex-1 sm:flex-none';
+        const inactiveClass = 'px-6 py-3 md:px-8 md:py-3.5 rounded-xl text-sm md:text-base font-bold transition-all duration-300 border inactive-btn flex-1 sm:flex-none';
 
         btnAc.addEventListener('click', () => {
+            // Prevent reloading if already on this page
             if (frame.src.includes(FILE_AC)) return;
+            
+            // Fade out
             frame.style.opacity = '0';
+            
             setTimeout(() => {
+                // Switch source and update buttons
                 frame.src = FILE_AC;
                 btnAc.className = activeClass;
                 btnCyclo.className = inactiveClass;
+                
+                // Fade back in once loaded
                 frame.onload = () => frame.style.opacity = '1';
             }, 150);
         });
 
         btnCyclo.addEventListener('click', () => {
+            // Prevent reloading if already on this page
             if (frame.src.includes(FILE_CYCLO)) return;
+            
+            // Fade out
             frame.style.opacity = '0';
+            
             setTimeout(() => {
+                // Switch source and update buttons
                 frame.src = FILE_CYCLO;
                 btnCyclo.className = activeClass;
                 btnAc.className = inactiveClass;
+                
+                // Fade back in once loaded
                 frame.onload = () => frame.style.opacity = '1';
             }, 150);
         });
