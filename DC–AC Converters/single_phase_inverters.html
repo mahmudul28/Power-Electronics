@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DC-AC Converters: Single-Phase Inverters</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Premium Color Palette Variables */
+        :root {
+            --bg-deep: #050505;
+            --bg-glow: #0a0f1c;
+            --volt-color: #ff2a5f;      /* Neon Rose for Voltage */
+            --curr-color: #00f0ff;      /* Electric Cyan for Current */
+            --math-color: #f59e0b;      /* Amber for Equations */
+            --grid-line: rgba(255, 255, 255, 0.07);
+            --glass-bg: rgba(15, 23, 42, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: radial-gradient(circle at top, var(--bg-glow) 0%, var(--bg-deep) 100%);
+            color: #f8fafc; 
+            min-height: 100vh;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; border: 1px solid rgba(255,255,255,0.05); }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        .dot-grid {
+            background-image: radial-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            margin: 10px 0;
+        }
+        input[type=range]:focus { outline: none; }
+        
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.05);
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+        }
+        
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #fff;
+            margin-top: -6.5px;
+            cursor: pointer;
+            box-shadow: 0 0 10px currentColor, 0 0 5px rgba(255,255,255,0.8);
+            border: 2px solid currentColor;
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:active { transform: scale(1.2); }
+        
+        .slider-tau { color: var(--curr-color); }
+        
+        svg path { transition: d 0.1s ease-out; }
+
+        .active-btn {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2));
+            border-color: #a855f7;
+            box-shadow: 0 0 15px rgba(168, 85, 247, 0.3), inset 0 0 10px rgba(99, 102, 241, 0.2);
+            color: #fff;
+        }
+
+        /* Clean sub texts in normal HTML */
+        .sub { font-size: 0.75em; vertical-align: sub; line-height: 0; }
+        
+        /* Table 6.1 styling */
+        .table-6-1 th, .table-6-1 td { padding: 6px 8px; text-align: left; }
+        .table-6-1 th { border-bottom: 1px solid rgba(255,255,255,0.1); font-weight: 600; color: #cbd5e1; }
+        .table-6-1 tr:not(:last-child) td { border-bottom: 1px solid rgba(255,255,255,0.05); }
+    </style>
+</head>
+<body class="p-4 md:p-8 flex flex-col items-center">
+
+    <div class="w-full max-w-[1400px] flex flex-col gap-6">
+        
+        <!-- Header Section -->
+        <div class="glass-panel rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center gap-6 relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_3s_infinite]"></div>
+            
+            <div>
+                <div class="flex items-center gap-3 mb-1">
+                    <span class="bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 px-2 py-0.5 rounded text-xs uppercase tracking-widest shadow-[inset_0_0_10px_rgba(99,102,241,0.2)]">Chapter 6</span>
+                    <h1 class="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+                        Single-Phase Inverters
+                    </h1>
+                </div>
+                <p class="text-slate-400 text-sm font-medium tracking-wide">Fundamental Half-Bridge and Full-Bridge Analysis</p>
+            </div>
+            
+            <div class="text-right hidden md:block">
+                <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">Color Legend</p>
+                <div class="flex gap-4 items-center justify-end">
+                    <div class="flex items-center gap-2">
+                        <div class="h-2 w-4 rounded bg-[var(--volt-color)] shadow-[0_0_8px_var(--volt-color)]"></div>
+                        <span class="text-xs text-slate-300">Voltage (v)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="h-2 w-4 rounded bg-[var(--curr-color)] shadow-[0_0_8px_var(--curr-color)]"></div>
+                        <span class="text-xs text-slate-300">Current (i)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Middle Content Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            
+            <!-- Controls (1/4 Width) -->
+            <div class="flex flex-col gap-6">
+                
+                <!-- Topology Selector -->
+                <div class="glass-panel rounded-2xl p-5">
+                    <label class="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">
+                        <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                        Circuit Topology
+                    </label>
+                    <div class="flex flex-col gap-3">
+                        <button data-top="half" class="w-full text-left px-5 py-3 rounded-xl transition-all duration-300 border active-btn font-bold scale-[1.02]">
+                            Single-Phase Half-Bridge
+                        </button>
+                        <button data-top="full" class="w-full text-left px-5 py-3 rounded-xl transition-all duration-300 border bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white">
+                            Single-Phase Full-Bridge
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Full-Bridge Modes Panel -->
+                <div id="panel-fb-modes" class="glass-panel rounded-2xl p-4 hidden transition-all duration-300">
+                    <label class="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                        <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                        Operating Modes
+                    </label>
+                    
+                    <div class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-2 mb-2">Dynamic AC Generation</div>
+                    <div class="flex flex-col gap-2 mb-3">
+                        <button data-fb="dynamic" class="w-full text-left px-3 py-2 rounded-lg transition-all duration-300 border active-btn font-bold scale-[1.02] text-xs">Dynamic Square-Wave (States 1 ↔ 2)</button>
+                    </div>
+
+                    <div class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-3 mb-2">Freeze Static States (Table 6.1)</div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button data-fb="st1" class="w-full text-center px-2 py-2 rounded-lg transition-all duration-300 border bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white text-xs">State 1</button>
+                        <button data-fb="st2" class="w-full text-center px-2 py-2 rounded-lg transition-all duration-300 border bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white text-xs">State 2</button>
+                        <button data-fb="st3" class="w-full text-center px-2 py-2 rounded-lg transition-all duration-300 border bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white text-xs">State 3</button>
+                        <button data-fb="st4" class="w-full text-center px-2 py-2 rounded-lg transition-all duration-300 border bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white text-xs">State 4</button>
+                        <button data-fb="st5" class="col-span-2 w-full text-center px-3 py-2 rounded-lg transition-all duration-300 border bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white text-xs">State 5 (All OFF)</button>
+                    </div>
+                </div>
+
+                <!-- Load Characteristic (Inductance) -->
+                <div class="glass-panel rounded-2xl p-5 flex-grow">
+                    <label class="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">
+                        <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        Load Characteristics
+                    </label>
+                    <div class="bg-black/20 p-4 rounded-xl border border-[var(--curr-color)]/20 shadow-[inset_0_0_20px_rgba(0,240,255,0.05)]">
+                        <div class="flex justify-between mb-3">
+                            <span class="text-xs font-bold text-[var(--curr-color)] uppercase tracking-wider">Inductance (L)</span>
+                            <span class="mono text-[var(--curr-color)] font-bold bg-[var(--curr-color)]/10 px-2 py-0.5 rounded" id="val-tau">Large L</span>
+                        </div>
+                        <input type="range" id="slider-tau" min="1" max="500" step="1" value="300" class="slider-tau">
+                        <p class="text-[10px] text-slate-500 mt-2 leading-relaxed">Increase to see <strong class="text-slate-300">triangular current</strong> and diode conduction (<span class="whitespace-nowrap">D<span class="sub">1</span></span>, <span class="whitespace-nowrap">D<span class="sub">2</span></span> feedback).</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inverter Blueprint & Table 6.1 (2/4 Width) -->
+            <div class="glass-panel rounded-2xl p-5 lg:col-span-2 flex flex-col">
+                <label class="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">
+                    <svg class="w-4 h-4 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path></svg>
+                    <span id="topology-title">Half-Bridge Circuit Diagram</span>
+                </label>
+                <div class="w-full flex justify-center items-center bg-black/40 rounded-xl border border-white/5 py-4 dot-grid mb-4">
+                    <div id="circuit-diagram" class="w-full max-w-lg">
+                        <!-- SVG injected here -->
+                    </div>
+                </div>
+
+                <!-- TABLE 6.1 (Hidden in Half-Bridge mode) -->
+                <div id="table-container" class="hidden overflow-x-auto rounded-xl border border-white/10 bg-black/30">
+                    <div class="p-2 bg-white/5 border-b border-white/10 text-center">
+                        <span class="text-xs font-bold text-slate-300">TABLE 6.1: Switch States for a Single-Phase Full-Bridge Inverter</span>
+                    </div>
+                    <table class="w-full text-[11px] table-6-1 text-slate-300">
+                        <thead class="bg-black/40">
+                            <tr>
+                                <th>State Definition</th>
+                                <th>No.</th>
+                                <th>State*</th>
+                                <th>v<span class="sub">ao</span></th>
+                                <th>v<span class="sub">bo</span></th>
+                                <th>v<span class="sub">o</span></th>
+                                <th>Components Conducting</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr id="row-st1">
+                                <td>Q<span class="sub">1</span>, Q<span class="sub">2</span> are on; Q<span class="sub">4</span>, Q<span class="sub">3</span> are off</td>
+                                <td class="text-center">1</td>
+                                <td class="text-center font-mono">10</td>
+                                <td>V<span class="sub">s</span>/2</td>
+                                <td>-V<span class="sub">s</span>/2</td>
+                                <td>V<span class="sub">s</span></td>
+                                <td class="italic">Q<span class="sub">1</span> & Q<span class="sub">2</span> if i<span class="sub">o</span> > 0<br>D<span class="sub">1</span> & D<span class="sub">2</span> if i<span class="sub">o</span> < 0</td>
+                            </tr>
+                            <tr id="row-st2">
+                                <td>Q<span class="sub">4</span>, Q<span class="sub">3</span> are on; Q<span class="sub">1</span>, Q<span class="sub">2</span> are off</td>
+                                <td class="text-center">2</td>
+                                <td class="text-center font-mono">01</td>
+                                <td>-V<span class="sub">s</span>/2</td>
+                                <td>V<span class="sub">s</span>/2</td>
+                                <td>-V<span class="sub">s</span></td>
+                                <td class="italic">D<span class="sub">4</span> & D<span class="sub">3</span> if i<span class="sub">o</span> > 0<br>Q<span class="sub">4</span> & Q<span class="sub">3</span> if i<span class="sub">o</span> < 0</td>
+                            </tr>
+                            <tr id="row-st3">
+                                <td>Q<span class="sub">1</span>, Q<span class="sub">3</span> are on; Q<span class="sub">4</span>, Q<span class="sub">2</span> are off</td>
+                                <td class="text-center">3</td>
+                                <td class="text-center font-mono">11</td>
+                                <td>V<span class="sub">s</span>/2</td>
+                                <td>V<span class="sub">s</span>/2</td>
+                                <td>0</td>
+                                <td class="italic">Q<span class="sub">1</span> & D<span class="sub">3</span> if i<span class="sub">o</span> > 0<br>D<span class="sub">1</span> & Q<span class="sub">3</span> if i<span class="sub">o</span> < 0</td>
+                            </tr>
+                            <tr id="row-st4">
+                                <td>Q<span class="sub">4</span>, Q<span class="sub">2</span> are on; Q<span class="sub">1</span>, Q<span class="sub">3</span> are off</td>
+                                <td class="text-center">4</td>
+                                <td class="text-center font-mono">00</td>
+                                <td>-V<span class="sub">s</span>/2</td>
+                                <td>-V<span class="sub">s</span>/2</td>
+                                <td>0</td>
+                                <td class="italic">D<span class="sub">4</span> & Q<span class="sub">2</span> if i<span class="sub">o</span> > 0<br>Q<span class="sub">4</span> & D<span class="sub">2</span> if i<span class="sub">o</span> < 0</td>
+                            </tr>
+                            <tr id="row-st5">
+                                <td>Q<span class="sub">1</span>, Q<span class="sub">2</span>, Q<span class="sub">3</span>, Q<span class="sub">4</span> are all off</td>
+                                <td class="text-center">5</td>
+                                <td class="text-center font-mono">off</td>
+                                <td>-V<span class="sub">s</span>/2<br>V<span class="sub">s</span>/2</td>
+                                <td>V<span class="sub">s</span>/2<br>-V<span class="sub">s</span>/2</td>
+                                <td>-V<span class="sub">s</span><br>V<span class="sub">s</span></td>
+                                <td class="italic">D<span class="sub">4</span> & D<span class="sub">3</span> if i<span class="sub">o</span> > 0<br>D<span class="sub">1</span> & D<span class="sub">2</span> if i<span class="sub">o</span> < 0</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="text-[9px] text-slate-500 p-2 italic">* 1 if an upper switch is on and 0 if a lower switch is on.</div>
+                </div>
+
+            </div>
+
+            <!-- Fourier Transform & Equations (1/4 Width) -->
+            <div class="glass-panel rounded-2xl p-5 flex flex-col gap-4">
+                <label class="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                    <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                    Mathematical Analysis
+                </label>
+                
+                <div id="status-switches" class="bg-indigo-500/10 p-3 rounded-lg border border-indigo-500/20 text-slate-200 text-sm leading-relaxed">
+                    <!-- Injected by JS -->
+                </div>
+
+                <div class="bg-black/30 rounded-xl p-4 border border-[var(--math-color)]/20 flex flex-col gap-4">
+                    
+                    <div>
+                        <span class="text-[10px] font-bold text-[var(--math-color)] uppercase tracking-wider block mb-1">Fourier Transform (v<span class="sub">o</span>)</span>
+                        <div class="bg-[var(--math-color)]/5 p-3 rounded-lg border border-[var(--math-color)]/10 font-serif text-sm text-slate-200" id="eq-fourier">
+                            <!-- Injected -->
+                        </div>
+                    </div>
+
+                    <div>
+                        <span class="text-[10px] font-bold text-[var(--math-color)] uppercase tracking-wider block mb-1">RMS Output Voltage (V<span class="sub">o_rms</span>)</span>
+                        <div class="bg-[var(--math-color)]/5 p-3 rounded-lg border border-[var(--math-color)]/10 font-serif text-lg text-slate-200 text-center" id="eq-rms">
+                            <!-- Injected -->
+                        </div>
+                    </div>
+
+                    <div>
+                        <span class="text-[10px] font-bold text-[var(--math-color)] uppercase tracking-wider block mb-1">Fundamental Peak (V<span class="sub">o1_peak</span>)</span>
+                        <div class="bg-[var(--math-color)]/5 p-3 rounded-lg border border-[var(--math-color)]/10 font-serif text-lg text-slate-200 text-center" id="eq-fund">
+                            <!-- Injected -->
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Full Width Waveform Display Area -->
+        <div class="glass-panel rounded-2xl p-1 flex-grow overflow-hidden flex flex-col border-t border-t-white/10 relative shadow-[0_0_50px_rgba(0,240,255,0.05)]">
+            <div class="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.1)_50%)] bg-[length:100%_4px] z-10 opacity-30"></div>
+            
+            <div class="w-full h-full overflow-x-auto p-4 custom-scrollbar text-center relative z-0">
+                <div id="svg-wrapper" style="margin: 0 auto; width: 100%; min-width: 1000px;">
+                    <!-- SVGs injected via JS -->
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    <script>
+        const state = {
+            topology: 'half',
+            tau: 300, 
+            fbMode: 'dynamic' // 'dynamic', 'st1', 'st2', 'st3', 'st4', 'st5'
+        };
+
+        const el = {
+            sliderTau: document.getElementById('slider-tau'),
+            valTau: document.getElementById('val-tau'),
+            wrapper: document.getElementById('svg-wrapper'),
+            circuit: document.getElementById('circuit-diagram'),
+            topTitle: document.getElementById('topology-title'),
+            eqFourier: document.getElementById('eq-fourier'),
+            eqRms: document.getElementById('eq-rms'),
+            eqFund: document.getElementById('eq-fund'),
+            panelFbModes: document.getElementById('panel-fb-modes'),
+            statusSwitches: document.getElementById('status-switches'),
+            tableContainer: document.getElementById('table-container')
+        };
+
+        // Helpers to prevent word breaks in UI switch names
+        const _Q1 = '<span class="whitespace-nowrap">Q<span class="sub">1</span></span>';
+        const _Q2 = '<span class="whitespace-nowrap">Q<span class="sub">2</span></span>';
+        const _Q3 = '<span class="whitespace-nowrap">Q<span class="sub">3</span></span>';
+        const _Q4 = '<span class="whitespace-nowrap">Q<span class="sub">4</span></span>';
+        const _D1 = '<span class="whitespace-nowrap">D<span class="sub">1</span></span>';
+        const _D2 = '<span class="whitespace-nowrap">D<span class="sub">2</span></span>';
+        const _D3 = '<span class="whitespace-nowrap">D<span class="sub">3</span></span>';
+        const _D4 = '<span class="whitespace-nowrap">D<span class="sub">4</span></span>';
+
+        // Smart formatter: cleanly wraps text after underscore in a baseline-shifted tspan
+        const formatText = (text) => {
+            return text.replace(/_([a-zA-Z0-9]+)/g, '<tspan baseline-shift="sub" font-size="0.65em">$1</tspan>');
+        };
+
+        // Complete & Accurate SVG Definitions matching textbook exactly
+        const SVG_DEFS = `<svg width="0" height="0" class="hidden">
+            <defs>
+                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="2" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+                <filter id="glow-intense" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="3.5" result="blur1" />
+                    <feGaussianBlur stdDeviation="1" result="blur2" />
+                    <feMerge>
+                        <feMergeNode in="blur1" />
+                        <feMergeNode in="blur2" />
+                        <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                </filter>
+                
+                <!-- Accurate Transistor (IGBT/BJT) Symbol - Facing Right -->
+                <g id="transistor-r">
+                    <line x1="0" y1="-8" x2="0" y2="8" stroke="currentColor" stroke-width="2.5"/>
+                    <line x1="-12" y1="0" x2="0" y2="0" stroke="currentColor" stroke-width="2.5"/>
+                    <circle cx="-14" cy="0" r="1.5" fill="currentColor"/>
+                    <line x1="0" y1="-4" x2="10" y2="-12" stroke="currentColor" stroke-width="2.5"/>
+                    <line x1="10" y1="-12" x2="10" y2="-20" stroke="currentColor" stroke-width="2.5"/>
+                    <line x1="0" y1="4" x2="10" y2="12" stroke="currentColor" stroke-width="2.5"/>
+                    <line x1="10" y1="12" x2="10" y2="20" stroke="currentColor" stroke-width="2.5"/>
+                    <polygon points="3,13 10,7 10,13" fill="currentColor"/>
+                </g>
+
+                <!-- Accurate Transistor (IGBT/BJT) Symbol - Facing Left -->
+                <g id="transistor-l">
+                    <line x1="0" y1="-8" x2="0" y2="8" stroke="currentColor" stroke-width="2.5"/>
+                    <line x1="12" y1="0" x2="0" y2="0" stroke="currentColor" stroke-width="2.5"/>
+                    <circle cx="14" cy="0" r="1.5" fill="currentColor"/>
+                    <line x1="0" y1="-4" x2="-10" y2="-12" stroke="currentColor" stroke-width="2.5"/>
+                    <line x1="-10" y1="-12" x2="-10" y2="-20" stroke="currentColor" stroke-width="2.5"/>
+                    <line x1="0" y1="4" x2="-10" y2="12" stroke="currentColor" stroke-width="2.5"/>
+                    <line x1="-10" y1="12" x2="-10" y2="20" stroke="currentColor" stroke-width="2.5"/>
+                    <polygon points="-3,13 -10,7 -10,13" fill="currentColor"/>
+                </g>
+
+                <!-- Accurate Diode Symbol (Pointing UP) -->
+                <g id="diode-up">
+                    <polygon points="-8,8 8,8 0,-6" fill="currentColor" stroke="currentColor" stroke-width="1"/>
+                    <line x1="-8" y1="-6" x2="8" y2="-6" stroke="currentColor" stroke-width="2.5"/>
+                    <line x1="0" y1="-20" x2="0" y2="-6" stroke="currentColor" stroke-width="2.5"/>
+                    <line x1="0" y1="8" x2="0" y2="20" stroke="currentColor" stroke-width="2.5"/>
+                </g>
+
+                <g id="dc-source">
+                    <line x1="-15" y1="-20" x2="15" y2="-20" stroke="currentColor" stroke-width="3"/>
+                    <line x1="-8" y1="-10" x2="8" y2="-10" stroke="currentColor" stroke-width="4"/>
+                    <line x1="-15" y1="0" x2="15" y2="0" stroke="currentColor" stroke-width="3"/>
+                    <line x1="-8" y1="10" x2="8" y2="10" stroke="currentColor" stroke-width="4"/>
+                    <line x1="0" y1="-20" x2="0" y2="-40" stroke="currentColor" stroke-width="2.5"/>
+                    <line x1="0" y1="10" x2="0" y2="30" stroke="currentColor" stroke-width="2.5"/>
+                </g>
+                <g id="capacitor">
+                    <line x1="0" y1="-30" x2="0" y2="-5" stroke="currentColor" stroke-width="2.5"/>
+                    <line x1="-15" y1="-5" x2="15" y2="-5" stroke="currentColor" stroke-width="3"/>
+                    <line x1="-15" y1="5" x2="15" y2="5" stroke="currentColor" stroke-width="3"/>
+                    <line x1="0" y1="5" x2="0" y2="30" stroke="currentColor" stroke-width="2.5"/>
+                </g>
+            </defs>
+        </svg>`;
+
+        const drawCircuit = () => {
+            const wire = "#64748b";
+            const device = "#cbd5e1";
+            const loadCol = "#f59e0b";
+            const currCol = "#00f0ff"; // For i1 arrow
+            
+            let svg = `<svg viewBox="0 0 600 280" class="w-full h-auto">`;
+            
+            if (state.topology === 'half') {
+                svg += `
+                <!-- DC Source -->
+                <use href="#dc-source" x="60" y="140" class="text-slate-400"/>
+                <text x="15" y="145" fill="${device}" font-size="16" font-weight="bold">${formatText('V_s')}</text>
+                <text x="30" y="100" fill="${device}" font-size="18" font-weight="bold">+</text>
+                <text x="30" y="200" fill="${device}" font-size="22" font-weight="bold">-</text>
+
+                <!-- Top & Bottom Rails -->
+                <path d="M 60,100 L 60,60 L 440,60" fill="none" stroke="${wire}" stroke-width="2.5"/>
+                <path d="M 60,170 L 60,220 L 440,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
+
+                <!-- i1 Current Arrow (Top Rail to Q1) -->
+                <path d="M 440,60 L 440,75 M 435,70 L 440,75 L 445,70" fill="none" stroke="${currCol}" stroke-width="2.5"/>
+                <text x="450" y="70" fill="${currCol}" font-size="14" font-weight="bold" font-style="italic">${formatText('i_1')}</text>
+
+                <!-- Capacitors C1, C2 -->
+                <use href="#capacitor" x="160" y="90" fill="${device}" stroke="${device}"/>
+                <text x="180" y="95" fill="${device}" font-size="14" font-weight="bold">${formatText('C_1')}</text>
+                <text x="110" y="85" fill="${device}" font-size="12">${formatText('V_s/2')}</text>
+                <text x="140" y="70" fill="${device}" font-size="12">+</text>
+                <text x="140" y="115" fill="${device}" font-size="16">-</text>
+                
+                <use href="#capacitor" x="160" y="190" fill="${device}" stroke="${device}"/>
+                <text x="180" y="195" fill="${device}" font-size="14" font-weight="bold">${formatText('C_2')}</text>
+                <text x="110" y="185" fill="${device}" font-size="12">${formatText('V_s/2')}</text>
+                <text x="140" y="170" fill="${device}" font-size="12">+</text>
+                <text x="140" y="215" fill="${device}" font-size="16">-</text>
+                
+                <!-- Center Tap (0) -->
+                <path d="M 160,120 L 160,160" fill="none" stroke="${wire}" stroke-width="2.5"/>
+                <circle cx="160" cy="140" r="4" fill="${wire}"/>
+                <text x="145" y="145" fill="${device}" font-size="14" font-weight="bold">0</text>
+
+                <!-- Load Box (L & R) -->
+                <path d="M 160,140 L 210,140" fill="none" stroke="${wire}" stroke-width="2.5"/>
+                <path d="M 210,140 C 220,120 230,160 240,140 C 250,120 260,160 270,140" fill="none" stroke="${loadCol}" stroke-width="2.5"/>
+                <path d="M 270,140 L 280,140 L 285,130 L 295,150 L 305,130 L 315,150 L 320,140 L 360,140" fill="none" stroke="${loadCol}" stroke-width="2.5"/>
+                
+                <text x="235" y="170" fill="${loadCol}" font-size="14" font-weight="bold">L</text>
+                <text x="295" y="170" fill="${loadCol}" font-size="14" font-weight="bold">R</text>
+
+                <!-- Current Arrow io (from a to 0) -->
+                <path d="M 340,130 L 320,130 L 325,125 M 320,130 L 325,135" fill="none" stroke="${loadCol}" stroke-width="2"/>
+                <text x="325" y="120" fill="${loadCol}" font-size="14" font-weight="bold" font-style="italic">${formatText('i_o')}</text>
+
+                <!-- Separate Diode Leg (D1, D2) -->
+                <path d="M 360,60 L 360,80 M 360,120 L 360,160 M 360,200 L 360,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
+                <use href="#diode-up" x="360" y="100" fill="${device}" stroke="${device}"/>
+                <text x="330" y="105" fill="${device}" font-size="14" font-weight="bold">${formatText('D_1')}</text>
+                
+                <use href="#diode-up" x="360" y="180" fill="${device}" stroke="${device}"/>
+                <text x="330" y="185" fill="${device}" font-size="14" font-weight="bold">${formatText('D_2')}</text>
+                
+                <circle cx="360" cy="140" r="4" fill="${wire}"/>
+                <text x="370" y="155" fill="${device}" font-size="14" font-weight="bold">a</text>
+
+                <!-- Load to Transistor Leg Connection -->
+                <path d="M 360,140 L 440,140" fill="none" stroke="${wire}" stroke-width="2.5"/>
+
+                <!-- Separate Transistor Leg (Q1, Q2) -->
+                <path d="M 440,60 L 440,80 M 440,120 L 440,160 M 440,200 L 440,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
+                <use href="#transistor-r" x="430" y="100" fill="${device}" stroke="${device}"/>
+                <text x="455" y="105" fill="${device}" font-size="14" font-weight="bold">${formatText('Q_1')}</text>
+                
+                <use href="#transistor-r" x="430" y="180" fill="${device}" stroke="${device}"/>
+                <text x="455" y="185" fill="${device}" font-size="14" font-weight="bold">${formatText('Q_2')}</text>
+                
+                <circle cx="440" cy="140" r="4" fill="${wire}"/>
+                `;
+            } else {
+                svg += `
+                <!-- DC Source -->
+                <use href="#dc-source" x="40" y="140" class="text-slate-400"/>
+                <text x="-5" y="145" fill="${device}" font-size="16" font-weight="bold">${formatText('V_s')}</text>
+                <text x="15" y="100" fill="${device}" font-size="18" font-weight="bold">+</text>
+                <text x="15" y="200" fill="${device}" font-size="22" font-weight="bold">-</text>
+
+                <!-- Top & Bottom Rails -->
+                <path d="M 40,100 L 40,60 L 520,60" fill="none" stroke="${wire}" stroke-width="2.5"/>
+                <path d="M 40,170 L 40,220 L 520,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
+                
+                <!-- Center Capacitors (C1, C2) -->
+                <use href="#capacitor" x="120" y="90" fill="${device}" stroke="${device}"/>
+                <text x="140" y="95" fill="${device}" font-size="14" font-weight="bold">${formatText('C_1')}</text>
+                <use href="#capacitor" x="120" y="190" fill="${device}" stroke="${device}"/>
+                <text x="140" y="195" fill="${device}" font-size="14" font-weight="bold">${formatText('C_2')}</text>
+                <path d="M 120,120 L 120,160" fill="none" stroke="${wire}" stroke-width="2.5"/>
+                <circle cx="120" cy="140" r="4" fill="${wire}"/>
+                <text x="105" y="145" fill="${device}" font-size="14" font-weight="bold">0</text>
+                
+                <text x="75" y="85" fill="${device}" font-size="12">${formatText('V_s/2')}</text>
+                <text x="75" y="185" fill="${device}" font-size="12">${formatText('V_s/2')}</text>
+
+                <!-- Far Left Leg (Q1, Q4) -->
+                <path d="M 200,60 L 200,80 M 200,120 L 200,160 M 200,200 L 200,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
+                <use href="#transistor-l" x="210" y="100" fill="${device}" stroke="${device}"/>
+                <text x="165" y="105" fill="${device}" font-size="14" font-weight="bold">${formatText('Q_1')}</text>
+
+                <use href="#transistor-l" x="210" y="180" fill="${device}" stroke="${device}"/>
+                <text x="165" y="185" fill="${device}" font-size="14" font-weight="bold">${formatText('Q_4')}</text>
+                <circle cx="200" cy="140" r="4" fill="${wire}"/>
+
+                <!-- Inner Left Leg (D1, D4) -->
+                <path d="M 200,140 L 260,140" fill="none" stroke="${wire}" stroke-width="2.5"/>
+                <path d="M 260,60 L 260,80 M 260,120 L 260,160 M 260,200 L 260,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
+                <use href="#diode-up" x="260" y="100" fill="${device}" stroke="${device}"/>
+                <text x="280" y="105" fill="${device}" font-size="14" font-weight="bold">${formatText('D_1')}</text>
+
+                <use href="#diode-up" x="260" y="180" fill="${device}" stroke="${device}"/>
+                <text x="280" y="185" fill="${device}" font-size="14" font-weight="bold">${formatText('D_4')}</text>
+                <circle cx="260" cy="140" r="4" fill="${wire}"/>
+                <text x="245" y="155" fill="${device}" font-size="14" font-weight="bold">a</text>
+
+                <!-- Load Box -->
+                <path d="M 260,140 L 310,140" fill="none" stroke="${wire}" stroke-width="2.5"/>
+                <rect x="310" y="120" width="100" height="40" fill="rgba(15,23,42,0.8)" stroke="${loadCol}" stroke-width="2" rx="4"/>
+                <text x="360" y="145" fill="${loadCol}" font-size="14" font-weight="bold" text-anchor="middle" filter="url(#glow)">Load</text>
+                <path d="M 410,140 L 460,140" fill="none" stroke="${wire}" stroke-width="2.5"/>
+
+                <!-- Current Arrow io (from a to b) -->
+                <path d="M 340,170 L 380,170 L 375,165 M 380,170 L 375,175" fill="none" stroke="${loadCol}" stroke-width="2"/>
+                <text x="390" y="175" fill="${loadCol}" font-size="14" font-weight="bold" font-style="italic">${formatText('i_o')}</text>
+
+                <!-- Inner Right Leg (D3, D2) -->
+                <path d="M 460,60 L 460,80 M 460,120 L 460,160 M 460,200 L 460,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
+                <use href="#diode-up" x="460" y="100" fill="${device}" stroke="${device}"/>
+                <text x="420" y="105" fill="${device}" font-size="14" font-weight="bold">${formatText('D_3')}</text>
+
+                <use href="#diode-up" x="460" y="180" fill="${device}" stroke="${device}"/>
+                <text x="420" y="185" fill="${device}" font-size="14" font-weight="bold">${formatText('D_2')}</text>
+                <circle cx="460" cy="140" r="4" fill="${wire}"/>
+                <text x="470" y="155" fill="${device}" font-size="14" font-weight="bold">b</text>
+                
+                <!-- Far Right Leg (Q3, Q2) -->
+                <path d="M 460,140 L 520,140" fill="none" stroke="${wire}" stroke-width="2.5"/>
+                <path d="M 520,60 L 520,80 M 520,120 L 520,160 M 520,200 L 520,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
+                <use href="#transistor-r" x="510" y="100" fill="${device}" stroke="${device}"/>
+                <text x="535" y="105" fill="${device}" font-size="14" font-weight="bold">${formatText('Q_3')}</text>
+
+                <use href="#transistor-r" x="510" y="180" fill="${device}" stroke="${device}"/>
+                <text x="535" y="185" fill="${device}" font-size="14" font-weight="bold">${formatText('Q_2')}</text>
+                <circle cx="520" cy="140" r="4" fill="${wire}"/>
+                `;
+            }
+            svg += `</svg>`;
+            return svg;
+        }
+
+        const updateMath = () => {
+            let switchText = '';
+
+            if (state.topology === 'half') {
+                switchText = `<strong>Half-Bridge Operation:</strong><br>+ Half-Cycle: ${_Q1} or ${_D1} conducts.<br>- Half-Cycle: ${_Q2} or ${_D2} conducts.`;
+                
+                el.eqFourier.innerHTML = `
+                    <div class="flex items-center gap-2 justify-center">
+                        <span class="italic text-lg">v<span class="sub">o</span> = </span>
+                        <span class="text-2xl leading-none mt-1">Σ</span>
+                        <div class="flex flex-col items-center">
+                            <span class="border-b border-slate-400 px-1">2 V<span class="sub">s</span></span>
+                            <span>nπ</span>
+                        </div>
+                        <span class="italic text-lg">sin(nωt)</span>
+                    </div>
+                    <div class="text-center text-xs text-slate-400 mt-2">For n = 1, 3, 5, ...</div>
+                `;
+                el.eqRms.innerHTML = `V<span class="sub">s</span> / 2`;
+                el.eqFund.innerHTML = `<div class="flex items-center gap-2 justify-center"><div class="flex flex-col items-center"><span class="border-b border-slate-400 px-1">2 V<span class="sub">s</span></span><span>π</span></div><span class="text-sm text-slate-400 ml-2">≈ 0.636 V<span class="sub">s</span></span></div>`;
+            } else {
+                
+                if (state.fbMode === 'dynamic') {
+                    switchText = `<strong>Dynamic AC Operation:</strong><br>Rapidly alternates between <strong>State 1</strong> (${_Q1}, ${_Q2} ON) and <strong>State 2</strong> (${_Q3}, ${_Q4} ON).`;
+                } else if (state.fbMode === 'st1') {
+                    switchText = `<strong>State 1 Active:</strong><br><span class="text-emerald-400">ON: ${_Q1}, ${_Q2}</span><br><span class="text-rose-400">OFF: ${_Q3}, ${_Q4}</span>`;
+                } else if (state.fbMode === 'st2') {
+                    switchText = `<strong>State 2 Active:</strong><br><span class="text-emerald-400">ON: ${_Q3}, ${_Q4}</span><br><span class="text-rose-400">OFF: ${_Q1}, ${_Q2}</span>`;
+                } else if (state.fbMode === 'st3') {
+                    switchText = `<strong>State 3 Active:</strong><br><span class="text-emerald-400">ON: ${_Q1}, ${_Q3} (Top)</span><br><span class="text-rose-400">OFF: ${_Q2}, ${_Q4} (Bottom)</span>`;
+                } else if (state.fbMode === 'st4') {
+                    switchText = `<strong>State 4 Active:</strong><br><span class="text-emerald-400">ON: ${_Q2}, ${_Q4} (Bottom)</span><br><span class="text-rose-400">OFF: ${_Q1}, ${_Q3} (Top)</span>`;
+                } else if (state.fbMode === 'st5') {
+                    switchText = `<strong>State 5 Active:</strong><br><span class="text-rose-400 font-bold">ALL SWITCHES OFF</span>`;
+                }
+
+                if (state.fbMode.startsWith('st')) {
+                    el.eqFourier.innerHTML = `<div class="text-center text-slate-400 text-sm mt-4 italic leading-relaxed">System frozen in Static State.<br>AC Fourier series inapplicable.</div>`;
+                    let vo = state.fbMode === 'st1' ? 'V<span class="sub">s</span>' : (state.fbMode === 'st2' ? '-V<span class="sub">s</span>' : '0');
+                    el.eqRms.innerHTML = vo;
+                    el.eqFund.innerHTML = `0`;
+                } else if (state.fbMode === 'dynamic') {
+                    el.eqFourier.innerHTML = `
+                        <div class="flex items-center gap-2 justify-center">
+                            <span class="italic text-lg">v<span class="sub">o</span> = </span>
+                            <span class="text-2xl leading-none mt-1">Σ</span>
+                            <div class="flex flex-col items-center">
+                                <span class="border-b border-slate-400 px-1">4 V<span class="sub">s</span></span>
+                                <span>nπ</span>
+                            </div>
+                            <span class="italic text-lg">sin(nωt)</span>
+                        </div>
+                        <div class="text-center text-xs text-slate-400 mt-2">For n = 1, 3, 5, ...</div>
+                    `;
+                    el.eqRms.innerHTML = `V<span class="sub">s</span>`;
+                    el.eqFund.innerHTML = `<div class="flex items-center gap-2 justify-center"><div class="flex flex-col items-center"><span class="border-b border-slate-400 px-1">4 V<span class="sub">s</span></span><span>π</span></div><span class="text-sm text-slate-400 ml-2">≈ 1.273 V<span class="sub">s</span></span></div>`;
+                }
+            }
+            el.statusSwitches.innerHTML = switchText;
+        }
+
+        const computeData = () => {
+            const arr = [];
+            const tauDegrees = state.tau; 
+            const V = state.topology === 'half' ? 0.5 : 1.0; 
+            
+            let io_val = 0;
+            const dt = 1;
+            const tau = tauDegrees < 2 ? 0.001 : tauDegrees;
+
+            const getStep = (deg, isPreroll = false) => {
+                let modDeg = deg % 360;
+                let vo=0, va=0, vb=0, activeState=0;
+
+                if (state.topology === 'half') {
+                    if (modDeg < 180) { vo = V; va = 0.5; vb = -0.5; activeState = 1; }
+                    else { vo = -V; va = -0.5; vb = 0.5; activeState = 2; }
+                } else {
+                    if (state.fbMode === 'dynamic') {
+                        if (modDeg < 180) { vo = V; va = 0.5; vb = -0.5; activeState = 1; }
+                        else { vo = -V; va = -0.5; vb = 0.5; activeState = 2; }
+                    }
+                }
+                return { vo, va, vb, activeState };
+            };
+
+            // Pre-roll
+            if (!state.fbMode.startsWith('st')) {
+                for (let i = 0; i < 360 * 5; i++) {
+                    let { vo } = getStep(i, true);
+                    if (tauDegrees < 2) io_val = vo;
+                    else io_val += (vo - io_val) * (dt / tau);
+                }
+            }
+
+            for (let deg = 0; deg <= 720; deg += 1) {
+                let vo=0, va=0, vb=0, activeState=0, c_band='', i1=0;
+
+                if (state.topology === 'full' && state.fbMode.startsWith('st')) {
+                    if (state.fbMode === 'st1') { vo = V; va = 0.5; vb = -0.5; io_val = V; c_band = 'Q1, Q2'; }
+                    else if (state.fbMode === 'st2') { vo = -V; va = -0.5; vb = 0.5; io_val = -V; c_band = 'Q3, Q4'; }
+                    else if (state.fbMode === 'st3') { vo = 0; va = 0.5; vb = 0.5; io_val = 0; c_band = 'Q1, Q3'; }
+                    else if (state.fbMode === 'st4') { vo = 0; va = -0.5; vb = -0.5; io_val = 0; c_band = 'Q2, Q4'; }
+                    else if (state.fbMode === 'st5') { vo = 0; va = 0; vb = 0; io_val = 0; c_band = 'ALL OFF'; }
+                    
+                    arr.push({ deg, vo, va, vb, io: io_val, i1: 0, c_band });
+                    continue;
+                }
+
+                let step = getStep(deg, false);
+                vo = step.vo; va = step.va; vb = step.vb; activeState = step.activeState;
+                
+                if (tauDegrees < 2) {
+                    io_val = vo;
+                } else {
+                    io_val += (vo - io_val) * (dt / tau);
+                }
+                
+                const i_thresh = 0.02;
+                
+                if (state.topology === 'half') {
+                    if (activeState === 1) { 
+                        c_band = io_val < -i_thresh ? 'D1' : 'Q1'; 
+                        i1 = io_val > 0 ? io_val : 0; // i1 only traces positive current through Q1
+                    }
+                    else if (activeState === 2) { 
+                        c_band = io_val > i_thresh ? 'D2' : 'Q2'; 
+                        i1 = 0; // Q1 is off
+                    }
+                } else {
+                    if (activeState === 1) c_band = io_val < -i_thresh ? 'D1, D2' : 'Q1, Q2';
+                    else if (activeState === 2) c_band = io_val > i_thresh ? 'D3, D4' : 'Q3, Q4';
+                }
+
+                arr.push({ deg, vo, va, vb, io: io_val, i1, c_band });
+            }
+            return arr;
+        };
+
+        const buildWaveChart = (title, data, lines, height = 160, center = 80, scale = 60, showConduction = false) => {
+            let svg = `<svg viewBox="0 0 720 ${height + (showConduction ? 30 : 0)}" class="w-full h-auto overflow-visible mb-6 block text-left" style="min-height: ${height}px;">`;
+            
+            for(let deg = 0; deg <= 720; deg += 90) {
+                svg += `<line x1="${deg}" y1="0" x2="${deg}" y2="${height}" stroke="rgba(255,255,255,0.07)" stroke-dasharray="2 2" stroke-width="1"/>`;
+                if(deg % 90 === 0) {
+                    let label = (deg === 0) ? '0' : (deg === 180 ? 'T/2' : (deg === 360 ? 'T' : (deg === 540 ? '3T/2' : (deg === 720 ? '2T' : ''))));
+                    if (label) svg += `<text x="${deg === 0 ? 2 : deg + 2}" y="${height - 4}" fill="#64748b" font-size="12" font-family="'JetBrains Mono', monospace">${label}</text>`;
+                }
+            }
+
+            svg += `<line x1="0" y1="${center}" x2="720" y2="${center}" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>`;
+            svg += `<text x="0" y="16" fill="#f8fafc" font-size="14" font-weight="bold" font-family="sans-serif" filter="url(#glow)">${formatText(title)}</text>`;
+
+            lines.forEach(line => {
+                if (!data.length) return;
+                let d = `M 0 ${center - (data[0][line.key] || 0) * scale}`;
+                for (let i = 1; i < data.length; i++) {
+                    const pt = data[i];
+                    const prevPt = data[i-1];
+                    const val = pt[line.key] || 0;
+                    const prevVal = prevPt[line.key] || 0;
+                    
+                    const x = pt.deg;
+                    const y = center - val * scale;
+                    const prevY = center - prevVal * scale;
+                    
+                    if (Math.abs(y - prevY) > scale * 0.5 && line.sharp) {
+                        d += ` L ${x} ${prevY}`;
+                    }
+                    d += ` L ${x} ${y}`;
+                }
+                
+                if (line.fill) {
+                    svg += `<path d="${d} L 720 ${center} L 0 ${center} Z" fill="${line.fill}" opacity="0.6"/>`;
+                }
+                
+                svg += `<path d="${d}" fill="none" stroke="${line.color}" stroke-width="${line.width || 2}" filter="url(#glow-intense)" ${line.dash ? `stroke-dasharray="${line.dash}"` : ''} stroke-linejoin="round" />`;
+            });
+
+            if (showConduction) {
+                let lastBand = data[0].c_band;
+                let startX = 0;
+                
+                const drawBand = (start, end, label) => {
+                    const width = end - start;
+                    if (width < 2) return; // Ignore micro-bands
+                    const midX = start + width / 2;
+                    svg += `<rect x="${start}" y="${height + 5}" width="${width}" height="20" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" rx="4"/>`;
+                    
+                    // Only draw text if the box is wide enough to prevent overlap
+                    if (width >= 25) {
+                        let fSize = width < 45 ? 9 : 12; // Dynamic font sizing for thin slices
+                        svg += `<text x="${midX}" y="${height + 19}" fill="#94a3b8" font-size="${fSize}" font-weight="bold" font-family="'JetBrains Mono', monospace" text-anchor="middle">${formatText(label)}</text>`;
+                    }
+                }
+
+                for (let i = 1; i < data.length; i++) {
+                    if (data[i].c_band !== lastBand) {
+                        drawBand(startX, data[i].deg, lastBand);
+                        lastBand = data[i].c_band;
+                        startX = data[i].deg;
+                    }
+                }
+                drawBand(startX, 720, lastBand);
+                svg += `<text x="0" y="${height + 15}" fill="#64748b" font-size="10" font-weight="bold" uppercase transform="translate(-55, 0)">CONDUCTS:</text>`;
+            }
+
+            svg += `</svg>`;
+            return svg;
+        };
+
+        const updateButtons = () => {
+            const activeClass = 'w-full text-left px-3 py-2 rounded-lg transition-all duration-300 border active-btn font-bold scale-[1.02] text-xs';
+            const inactiveClass = 'w-full text-left px-3 py-2 rounded-lg transition-all duration-300 border bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white text-xs';
+            
+            document.querySelectorAll('[data-top]').forEach(btn => {
+                if (btn.dataset.top === state.topology) {
+                    btn.className = 'w-full text-left px-5 py-3 rounded-xl transition-all duration-300 border active-btn font-bold scale-[1.02]';
+                } else {
+                    btn.className = 'w-full text-left px-5 py-3 rounded-xl transition-all duration-300 border bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white';
+                }
+            });
+
+            document.querySelectorAll('[data-fb]').forEach(btn => {
+                if (btn.dataset.fb === 'st5') {
+                    btn.className = (btn.dataset.fb === state.fbMode) ? activeClass.replace('text-left', 'text-center') + ' col-span-2' : inactiveClass.replace('text-left', 'text-center') + ' col-span-2';
+                } else {
+                    btn.className = (btn.dataset.fb === state.fbMode) ? activeClass : inactiveClass;
+                }
+            });
+            
+            el.topTitle.innerHTML = state.topology === 'half' 
+                ? 'Half-Bridge Circuit Diagram' 
+                : 'Full-Bridge Circuit Diagram';
+                
+            el.valTau.innerText = state.tau < 10 ? 'Resistive' : (state.tau > 250 ? 'Highly Ind.' : 'RL Load');
+
+            if (state.topology === 'full') {
+                el.panelFbModes.classList.remove('hidden');
+                el.tableContainer.classList.remove('hidden');
+            } else {
+                el.panelFbModes.classList.add('hidden');
+                el.tableContainer.classList.add('hidden');
+            }
+        };
+
+        const render = () => {
+            updateButtons();
+            updateMath();
+            
+            el.circuit.innerHTML = SVG_DEFS + drawCircuit();
+
+            const data = computeData();
+            let svgsHTML = SVG_DEFS;
+
+            if (state.topology === 'half') {
+                svgsHTML += buildWaveChart("Output Voltage (v_o = v_ao)", data, [
+                    { key: 'vo', color: 'var(--volt-color)', fill: 'rgba(255,42,95,0.15)', width: 2.5, sharp: true }
+                ], 150, 75, 100);
+                
+                // NEW: i1 waveform for Half-Bridge
+                svgsHTML += buildWaveChart("Transistor Current (i_1)", data, [
+                    { key: 'i1', color: '#a855f7', fill: 'rgba(168, 85, 247, 0.15)', width: 2, sharp: true }
+                ], 150, 120, 80);
+
+            } else {
+                svgsHTML += buildWaveChart("Branch Voltage (v_ao)", data, [
+                    { key: 'va', color: '#a855f7', fill: 'rgba(168, 85, 247, 0.15)', width: 2, sharp: true }
+                ], 120, 60, 80);
+                
+                svgsHTML += buildWaveChart("Branch Voltage (v_bo)", data, [
+                    { key: 'vb', color: '#ec4899', fill: 'rgba(236, 72, 153, 0.15)', width: 2, sharp: true }
+                ], 120, 60, 80);
+                
+                svgsHTML += buildWaveChart("Output Voltage (v_ab = v_ao - v_bo)", data, [
+                    { key: 'vo', color: 'var(--volt-color)', fill: 'rgba(255,42,95,0.15)', width: 2.5, sharp: true }
+                ], 150, 75, 60);
+            }
+
+            svgsHTML += buildWaveChart("Load Current (i_o)", data, [
+                { key: 'io', color: 'var(--curr-color)', width: 2.5 }
+            ], 180, 90, 80, true); 
+
+            el.wrapper.innerHTML = svgsHTML;
+        };
+
+        // Event Listeners
+        el.sliderTau.addEventListener('input', e => { state.tau = parseInt(e.target.value); render(); });
+        
+        document.querySelectorAll('[data-top]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                state.topology = e.target.dataset.top;
+                render();
+            });
+        });
+
+        document.querySelectorAll('[data-fb]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                state.fbMode = e.target.dataset.fb;
+                render();
+            });
+        });
+
+        // Initialize
+        render();
+    </script>
+</body>
+</html>
