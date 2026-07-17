@@ -88,7 +88,6 @@
             color: #fff;
         }
 
-        /* Clean sub texts in normal HTML */
         .sub { font-size: 0.75em; vertical-align: sub; line-height: 0; }
         
         /* Table 6.1 styling */
@@ -162,6 +161,9 @@
                     <div class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-2 mb-2">Dynamic AC Generation</div>
                     <div class="flex flex-col gap-2 mb-3">
                         <button data-fb="dynamic" class="w-full text-left px-3 py-2 rounded-lg transition-all duration-300 border active-btn font-bold scale-[1.02] text-xs">Dynamic Square-Wave (States 1 ↔ 2)</button>
+                        <button data-fb="mod_sq" class="w-full text-left px-3 py-2 rounded-lg transition-all duration-300 border bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white text-xs">Mod. Square (Alt. Zero: 1 → 3 → 2 → 4)</button>
+                        <button data-fb="mod_sq_top" class="w-full text-left px-3 py-2 rounded-lg transition-all duration-300 border bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white text-xs">Mod. Square (Top Zero: 1 → 3 → 2 → 3)</button>
+                        <button data-fb="mod_sq_bot" class="w-full text-left px-3 py-2 rounded-lg transition-all duration-300 border bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white text-xs">Mod. Square (Bot Zero: 1 → 4 → 2 → 4)</button>
                     </div>
 
                     <div class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-3 mb-2">Freeze Static States (Table 6.1)</div>
@@ -270,7 +272,6 @@
                     </table>
                     <div class="text-[9px] text-slate-500 p-2 italic">* 1 if an upper switch is on and 0 if a lower switch is on.</div>
                 </div>
-
             </div>
 
             <!-- Fourier Transform & Equations (1/4 Width) -->
@@ -287,7 +288,7 @@
                 <div class="bg-black/30 rounded-xl p-4 border border-[var(--math-color)]/20 flex flex-col gap-4">
                     
                     <div>
-                        <span class="text-[10px] font-bold text-[var(--math-color)] uppercase tracking-wider block mb-1">Fourier Transform (v<span class="sub">o</span>)</span>
+                        <span class="text-[10px] font-bold text-[var(--math-color)] uppercase tracking-wider block mb-1" id="fourier-label">Fourier Transform (v<span class="sub">o</span>)</span>
                         <div class="bg-[var(--math-color)]/5 p-3 rounded-lg border border-[var(--math-color)]/10 font-serif text-sm text-slate-200" id="eq-fourier">
                             <!-- Injected -->
                         </div>
@@ -333,7 +334,7 @@
         const state = {
             topology: 'half',
             tau: 300, 
-            fbMode: 'dynamic' // 'dynamic', 'st1', 'st2', 'st3', 'st4', 'st5'
+            fbMode: 'dynamic' // dynamic, mod_sq, mod_sq_top, mod_sq_bot, st1-st5
         };
 
         const el = {
@@ -342,6 +343,7 @@
             wrapper: document.getElementById('svg-wrapper'),
             circuit: document.getElementById('circuit-diagram'),
             topTitle: document.getElementById('topology-title'),
+            fourierLabel: document.getElementById('fourier-label'),
             eqFourier: document.getElementById('eq-fourier'),
             eqRms: document.getElementById('eq-rms'),
             eqFund: document.getElementById('eq-fund'),
@@ -350,7 +352,6 @@
             tableContainer: document.getElementById('table-container')
         };
 
-        // Helpers to prevent word breaks in UI switch names
         const _Q1 = '<span class="whitespace-nowrap">Q<span class="sub">1</span></span>';
         const _Q2 = '<span class="whitespace-nowrap">Q<span class="sub">2</span></span>';
         const _Q3 = '<span class="whitespace-nowrap">Q<span class="sub">3</span></span>';
@@ -360,19 +361,19 @@
         const _D3 = '<span class="whitespace-nowrap">D<span class="sub">3</span></span>';
         const _D4 = '<span class="whitespace-nowrap">D<span class="sub">4</span></span>';
 
-        // Smart formatter: cleanly wraps text after underscore in a baseline-shifted tspan
         const formatText = (text) => {
             return text.replace(/_([a-zA-Z0-9]+)/g, '<tspan baseline-shift="sub" font-size="0.65em">$1</tspan>');
         };
 
-        // Complete & Accurate SVG Definitions matching textbook exactly
         const SVG_DEFS = `<svg width="0" height="0" class="hidden">
             <defs>
                 <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
                     <feGaussianBlur stdDeviation="2" result="blur" />
                     <feComposite in="SourceGraphic" in2="blur" operator="over" />
                 </filter>
-                <filter id="glow-intense" x="-50%" y="-50%" width="200%" height="200%">
+                
+                <!-- NEW: Using fixed filterUnits to prevent 0-height clipping bug on static flat lines -->
+                <filter id="glow-intense" filterUnits="userSpaceOnUse" x="-50" y="-100" width="1000" height="400">
                     <feGaussianBlur stdDeviation="3.5" result="blur1" />
                     <feGaussianBlur stdDeviation="1" result="blur2" />
                     <feMerge>
@@ -382,7 +383,6 @@
                     </feMerge>
                 </filter>
                 
-                <!-- Accurate Transistor (IGBT/BJT) Symbol - Facing Right -->
                 <g id="transistor-r">
                     <line x1="0" y1="-8" x2="0" y2="8" stroke="currentColor" stroke-width="2.5"/>
                     <line x1="-12" y1="0" x2="0" y2="0" stroke="currentColor" stroke-width="2.5"/>
@@ -394,7 +394,6 @@
                     <polygon points="3,13 10,7 10,13" fill="currentColor"/>
                 </g>
 
-                <!-- Accurate Transistor (IGBT/BJT) Symbol - Facing Left -->
                 <g id="transistor-l">
                     <line x1="0" y1="-8" x2="0" y2="8" stroke="currentColor" stroke-width="2.5"/>
                     <line x1="12" y1="0" x2="0" y2="0" stroke="currentColor" stroke-width="2.5"/>
@@ -406,7 +405,6 @@
                     <polygon points="-3,13 -10,7 -10,13" fill="currentColor"/>
                 </g>
 
-                <!-- Accurate Diode Symbol (Pointing UP) -->
                 <g id="diode-up">
                     <polygon points="-8,8 8,8 0,-6" fill="currentColor" stroke="currentColor" stroke-width="1"/>
                     <line x1="-8" y1="-6" x2="8" y2="-6" stroke="currentColor" stroke-width="2.5"/>
@@ -435,45 +433,35 @@
             const wire = "#64748b";
             const device = "#cbd5e1";
             const loadCol = "#f59e0b";
-            const currCol = "#00f0ff"; // For i1 arrow
+            const currCol = "#00f0ff"; 
             
             let svg = `<svg viewBox="0 0 600 280" class="w-full h-auto">`;
             
             if (state.topology === 'half') {
                 svg += `
-                <!-- DC Source -->
                 <use href="#dc-source" x="60" y="140" class="text-slate-400"/>
                 <text x="15" y="145" fill="${device}" font-size="16" font-weight="bold">${formatText('V_s')}</text>
                 <text x="30" y="100" fill="${device}" font-size="18" font-weight="bold">+</text>
                 <text x="30" y="200" fill="${device}" font-size="22" font-weight="bold">-</text>
 
-                <!-- Top & Bottom Rails -->
                 <path d="M 60,100 L 60,60 L 440,60" fill="none" stroke="${wire}" stroke-width="2.5"/>
                 <path d="M 60,170 L 60,220 L 440,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
 
-                <!-- i1 Current Arrow (Top Rail to Q1) -->
                 <path d="M 440,60 L 440,75 M 435,70 L 440,75 L 445,70" fill="none" stroke="${currCol}" stroke-width="2.5"/>
                 <text x="450" y="70" fill="${currCol}" font-size="14" font-weight="bold" font-style="italic">${formatText('i_1')}</text>
 
-                <!-- Capacitors C1, C2 -->
                 <use href="#capacitor" x="160" y="90" fill="${device}" stroke="${device}"/>
                 <text x="180" y="95" fill="${device}" font-size="14" font-weight="bold">${formatText('C_1')}</text>
                 <text x="110" y="85" fill="${device}" font-size="12">${formatText('V_s/2')}</text>
-                <text x="140" y="70" fill="${device}" font-size="12">+</text>
-                <text x="140" y="115" fill="${device}" font-size="16">-</text>
                 
                 <use href="#capacitor" x="160" y="190" fill="${device}" stroke="${device}"/>
                 <text x="180" y="195" fill="${device}" font-size="14" font-weight="bold">${formatText('C_2')}</text>
                 <text x="110" y="185" fill="${device}" font-size="12">${formatText('V_s/2')}</text>
-                <text x="140" y="170" fill="${device}" font-size="12">+</text>
-                <text x="140" y="215" fill="${device}" font-size="16">-</text>
                 
-                <!-- Center Tap (0) -->
                 <path d="M 160,120 L 160,160" fill="none" stroke="${wire}" stroke-width="2.5"/>
                 <circle cx="160" cy="140" r="4" fill="${wire}"/>
                 <text x="145" y="145" fill="${device}" font-size="14" font-weight="bold">0</text>
 
-                <!-- Load Box (L & R) -->
                 <path d="M 160,140 L 210,140" fill="none" stroke="${wire}" stroke-width="2.5"/>
                 <path d="M 210,140 C 220,120 230,160 240,140 C 250,120 260,160 270,140" fill="none" stroke="${loadCol}" stroke-width="2.5"/>
                 <path d="M 270,140 L 280,140 L 285,130 L 295,150 L 305,130 L 315,150 L 320,140 L 360,140" fill="none" stroke="${loadCol}" stroke-width="2.5"/>
@@ -481,11 +469,9 @@
                 <text x="235" y="170" fill="${loadCol}" font-size="14" font-weight="bold">L</text>
                 <text x="295" y="170" fill="${loadCol}" font-size="14" font-weight="bold">R</text>
 
-                <!-- Current Arrow io (from a to 0) -->
                 <path d="M 340,130 L 320,130 L 325,125 M 320,130 L 325,135" fill="none" stroke="${loadCol}" stroke-width="2"/>
                 <text x="325" y="120" fill="${loadCol}" font-size="14" font-weight="bold" font-style="italic">${formatText('i_o')}</text>
 
-                <!-- Separate Diode Leg (D1, D2) -->
                 <path d="M 360,60 L 360,80 M 360,120 L 360,160 M 360,200 L 360,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
                 <use href="#diode-up" x="360" y="100" fill="${device}" stroke="${device}"/>
                 <text x="330" y="105" fill="${device}" font-size="14" font-weight="bold">${formatText('D_1')}</text>
@@ -496,10 +482,8 @@
                 <circle cx="360" cy="140" r="4" fill="${wire}"/>
                 <text x="370" y="155" fill="${device}" font-size="14" font-weight="bold">a</text>
 
-                <!-- Load to Transistor Leg Connection -->
                 <path d="M 360,140 L 440,140" fill="none" stroke="${wire}" stroke-width="2.5"/>
 
-                <!-- Separate Transistor Leg (Q1, Q2) -->
                 <path d="M 440,60 L 440,80 M 440,120 L 440,160 M 440,200 L 440,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
                 <use href="#transistor-r" x="430" y="100" fill="${device}" stroke="${device}"/>
                 <text x="455" y="105" fill="${device}" font-size="14" font-weight="bold">${formatText('Q_1')}</text>
@@ -511,17 +495,14 @@
                 `;
             } else {
                 svg += `
-                <!-- DC Source -->
                 <use href="#dc-source" x="40" y="140" class="text-slate-400"/>
                 <text x="-5" y="145" fill="${device}" font-size="16" font-weight="bold">${formatText('V_s')}</text>
                 <text x="15" y="100" fill="${device}" font-size="18" font-weight="bold">+</text>
                 <text x="15" y="200" fill="${device}" font-size="22" font-weight="bold">-</text>
 
-                <!-- Top & Bottom Rails -->
                 <path d="M 40,100 L 40,60 L 520,60" fill="none" stroke="${wire}" stroke-width="2.5"/>
                 <path d="M 40,170 L 40,220 L 520,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
                 
-                <!-- Center Capacitors (C1, C2) -->
                 <use href="#capacitor" x="120" y="90" fill="${device}" stroke="${device}"/>
                 <text x="140" y="95" fill="${device}" font-size="14" font-weight="bold">${formatText('C_1')}</text>
                 <use href="#capacitor" x="120" y="190" fill="${device}" stroke="${device}"/>
@@ -533,7 +514,6 @@
                 <text x="75" y="85" fill="${device}" font-size="12">${formatText('V_s/2')}</text>
                 <text x="75" y="185" fill="${device}" font-size="12">${formatText('V_s/2')}</text>
 
-                <!-- Far Left Leg (Q1, Q4) -->
                 <path d="M 200,60 L 200,80 M 200,120 L 200,160 M 200,200 L 200,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
                 <use href="#transistor-l" x="210" y="100" fill="${device}" stroke="${device}"/>
                 <text x="165" y="105" fill="${device}" font-size="14" font-weight="bold">${formatText('Q_1')}</text>
@@ -542,7 +522,6 @@
                 <text x="165" y="185" fill="${device}" font-size="14" font-weight="bold">${formatText('Q_4')}</text>
                 <circle cx="200" cy="140" r="4" fill="${wire}"/>
 
-                <!-- Inner Left Leg (D1, D4) -->
                 <path d="M 200,140 L 260,140" fill="none" stroke="${wire}" stroke-width="2.5"/>
                 <path d="M 260,60 L 260,80 M 260,120 L 260,160 M 260,200 L 260,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
                 <use href="#diode-up" x="260" y="100" fill="${device}" stroke="${device}"/>
@@ -553,17 +532,14 @@
                 <circle cx="260" cy="140" r="4" fill="${wire}"/>
                 <text x="245" y="155" fill="${device}" font-size="14" font-weight="bold">a</text>
 
-                <!-- Load Box -->
                 <path d="M 260,140 L 310,140" fill="none" stroke="${wire}" stroke-width="2.5"/>
                 <rect x="310" y="120" width="100" height="40" fill="rgba(15,23,42,0.8)" stroke="${loadCol}" stroke-width="2" rx="4"/>
                 <text x="360" y="145" fill="${loadCol}" font-size="14" font-weight="bold" text-anchor="middle" filter="url(#glow)">Load</text>
                 <path d="M 410,140 L 460,140" fill="none" stroke="${wire}" stroke-width="2.5"/>
 
-                <!-- Current Arrow io (from a to b) -->
                 <path d="M 340,170 L 380,170 L 375,165 M 380,170 L 375,175" fill="none" stroke="${loadCol}" stroke-width="2"/>
                 <text x="390" y="175" fill="${loadCol}" font-size="14" font-weight="bold" font-style="italic">${formatText('i_o')}</text>
 
-                <!-- Inner Right Leg (D3, D2) -->
                 <path d="M 460,60 L 460,80 M 460,120 L 460,160 M 460,200 L 460,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
                 <use href="#diode-up" x="460" y="100" fill="${device}" stroke="${device}"/>
                 <text x="420" y="105" fill="${device}" font-size="14" font-weight="bold">${formatText('D_3')}</text>
@@ -573,7 +549,6 @@
                 <circle cx="460" cy="140" r="4" fill="${wire}"/>
                 <text x="470" y="155" fill="${device}" font-size="14" font-weight="bold">b</text>
                 
-                <!-- Far Right Leg (Q3, Q2) -->
                 <path d="M 460,140 L 520,140" fill="none" stroke="${wire}" stroke-width="2.5"/>
                 <path d="M 520,60 L 520,80 M 520,120 L 520,160 M 520,200 L 520,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
                 <use href="#transistor-r" x="510" y="100" fill="${device}" stroke="${device}"/>
@@ -612,20 +587,26 @@
                 
                 if (state.fbMode === 'dynamic') {
                     switchText = `<strong>Dynamic AC Operation:</strong><br>Rapidly alternates between <strong>State 1</strong> (${_Q1}, ${_Q2} ON) and <strong>State 2</strong> (${_Q3}, ${_Q4} ON).`;
+                } else if (state.fbMode.startsWith('mod_sq')) {
+                    let seq = '';
+                    if (state.fbMode === 'mod_sq') seq = '<strong>State 3 & 4</strong> (Alternating)';
+                    if (state.fbMode === 'mod_sq_top') seq = '<strong>State 3</strong> (Top only)';
+                    if (state.fbMode === 'mod_sq_bot') seq = '<strong>State 4</strong> (Bottom only)';
+                    switchText = `<strong>Modified Square Wave:</strong><br>Dynamically inserts $0\\text{V}$ resting periods using ${seq}.<br><em>This shifts component heat load, but the output ($v_o$) remains identical!</em>`;
                 } else if (state.fbMode === 'st1') {
-                    switchText = `<strong>State 1 Active:</strong><br><span class="text-emerald-400">ON: ${_Q1}, ${_Q2}</span><br><span class="text-rose-400">OFF: ${_Q3}, ${_Q4}</span>`;
+                    switchText = `<strong>State 1 Active (STATIC DC):</strong><br><span class="text-emerald-400">ON: ${_Q1}, ${_Q2}</span><br><span class="text-xs text-slate-400 mt-1 block">Output locked at flat +V<sub>s</sub>.</span>`;
                 } else if (state.fbMode === 'st2') {
-                    switchText = `<strong>State 2 Active:</strong><br><span class="text-emerald-400">ON: ${_Q3}, ${_Q4}</span><br><span class="text-rose-400">OFF: ${_Q1}, ${_Q2}</span>`;
+                    switchText = `<strong>State 2 Active (STATIC DC):</strong><br><span class="text-emerald-400">ON: ${_Q3}, ${_Q4}</span><br><span class="text-xs text-slate-400 mt-1 block">Output locked at flat -V<sub>s</sub>.</span>`;
                 } else if (state.fbMode === 'st3') {
-                    switchText = `<strong>State 3 Active:</strong><br><span class="text-emerald-400">ON: ${_Q1}, ${_Q3} (Top)</span><br><span class="text-rose-400">OFF: ${_Q2}, ${_Q4} (Bottom)</span>`;
+                    switchText = `<strong>State 3 Active (SHORTED):</strong><br><span class="text-emerald-400">ON: ${_Q1}, ${_Q3} (Top)</span><br><span class="text-xs text-slate-400 mt-1 block">Output locked at flat 0V.</span>`;
                 } else if (state.fbMode === 'st4') {
-                    switchText = `<strong>State 4 Active:</strong><br><span class="text-emerald-400">ON: ${_Q2}, ${_Q4} (Bottom)</span><br><span class="text-rose-400">OFF: ${_Q1}, ${_Q3} (Top)</span>`;
+                    switchText = `<strong>State 4 Active (SHORTED):</strong><br><span class="text-emerald-400">ON: ${_Q2}, ${_Q4} (Bottom)</span><br><span class="text-xs text-slate-400 mt-1 block">Output locked at flat 0V.</span>`;
                 } else if (state.fbMode === 'st5') {
-                    switchText = `<strong>State 5 Active:</strong><br><span class="text-rose-400 font-bold">ALL SWITCHES OFF</span>`;
+                    switchText = `<strong>State 5 Active (OPEN):</strong><br><span class="text-rose-400 font-bold">ALL SWITCHES OFF</span><br><span class="text-xs text-slate-400 mt-1 block">Output locked at flat 0V.</span>`;
                 }
 
                 if (state.fbMode.startsWith('st')) {
-                    el.eqFourier.innerHTML = `<div class="text-center text-slate-400 text-sm mt-4 italic leading-relaxed">System frozen in Static State.<br>AC Fourier series inapplicable.</div>`;
+                    el.eqFourier.innerHTML = `<div class="text-center text-slate-400 text-sm mt-4 italic leading-relaxed">System frozen in Static DC State.<br>AC Fourier series inapplicable.</div>`;
                     let vo = state.fbMode === 'st1' ? 'V<span class="sub">s</span>' : (state.fbMode === 'st2' ? '-V<span class="sub">s</span>' : '0');
                     el.eqRms.innerHTML = vo;
                     el.eqFund.innerHTML = `0`;
@@ -644,6 +625,21 @@
                     `;
                     el.eqRms.innerHTML = `V<span class="sub">s</span>`;
                     el.eqFund.innerHTML = `<div class="flex items-center gap-2 justify-center"><div class="flex flex-col items-center"><span class="border-b border-slate-400 px-1">4 V<span class="sub">s</span></span><span>π</span></div><span class="text-sm text-slate-400 ml-2">≈ 1.273 V<span class="sub">s</span></span></div>`;
+                } else if (state.fbMode.startsWith('mod_sq')) {
+                    el.eqFourier.innerHTML = `
+                        <div class="flex items-center gap-2 justify-center">
+                            <span class="italic text-lg">v<span class="sub">o</span> = </span>
+                            <span class="text-2xl leading-none mt-1">Σ</span>
+                            <div class="flex flex-col items-center">
+                                <span class="border-b border-slate-400 px-1">4 V<span class="sub">s</span></span>
+                                <span>nπ</span>
+                            </div>
+                            <span class="italic text-lg">cos(n·30°)sin(nωt)</span>
+                        </div>
+                        <div class="text-center text-xs text-slate-400 mt-2">For n = 1, 5, 7... (<strong class="text-rose-400">n=3 is eliminated!</strong>)</div>
+                    `;
+                    el.eqRms.innerHTML = `V<span class="sub">s</span> <span class="text-sm text-slate-400 ml-1">× √(2/3)</span>`;
+                    el.eqFund.innerHTML = `<div class="flex items-center gap-2 justify-center">≈ 1.10 V<span class="sub">s</span></div>`;
                 }
             }
             el.statusSwitches.innerHTML = switchText;
@@ -669,12 +665,30 @@
                     if (state.fbMode === 'dynamic') {
                         if (modDeg < 180) { vo = V; va = 0.5; vb = -0.5; activeState = 1; }
                         else { vo = -V; va = -0.5; vb = 0.5; activeState = 2; }
+                    } else if (state.fbMode === 'mod_sq') {
+                        if (modDeg < 30) { vo = 0; va = 0.5; vb = 0.5; activeState = 3; }
+                        else if (modDeg < 150) { vo = V; va = 0.5; vb = -0.5; activeState = 1; }
+                        else if (modDeg < 210) { vo = 0; va = -0.5; vb = -0.5; activeState = 4; }
+                        else if (modDeg < 330) { vo = -V; va = -0.5; vb = 0.5; activeState = 2; }
+                        else { vo = 0; va = 0.5; vb = 0.5; activeState = 3; }
+                    } else if (state.fbMode === 'mod_sq_top') {
+                        if (modDeg < 30) { vo = 0; va = 0.5; vb = 0.5; activeState = 3; }
+                        else if (modDeg < 150) { vo = V; va = 0.5; vb = -0.5; activeState = 1; }
+                        else if (modDeg < 210) { vo = 0; va = 0.5; vb = 0.5; activeState = 3; }
+                        else if (modDeg < 330) { vo = -V; va = -0.5; vb = 0.5; activeState = 2; }
+                        else { vo = 0; va = 0.5; vb = 0.5; activeState = 3; }
+                    } else if (state.fbMode === 'mod_sq_bot') {
+                        if (modDeg < 30) { vo = 0; va = -0.5; vb = -0.5; activeState = 4; }
+                        else if (modDeg < 150) { vo = V; va = 0.5; vb = -0.5; activeState = 1; }
+                        else if (modDeg < 210) { vo = 0; va = -0.5; vb = -0.5; activeState = 4; }
+                        else if (modDeg < 330) { vo = -V; va = -0.5; vb = 0.5; activeState = 2; }
+                        else { vo = 0; va = -0.5; vb = -0.5; activeState = 4; }
                     }
                 }
                 return { vo, va, vb, activeState };
             };
 
-            // Pre-roll
+            // Pre-roll to stabilize inductor
             if (!state.fbMode.startsWith('st')) {
                 for (let i = 0; i < 360 * 5; i++) {
                     let { vo } = getStep(i, true);
@@ -684,16 +698,17 @@
             }
 
             for (let deg = 0; deg <= 720; deg += 1) {
-                let vo=0, va=0, vb=0, activeState=0, c_band='', i1=0;
+                let vo=0, va=0, vb=0, activeState=0, c_band='', i1=0, i2=0;
 
+                // Handle static frozen states
                 if (state.topology === 'full' && state.fbMode.startsWith('st')) {
-                    if (state.fbMode === 'st1') { vo = V; va = 0.5; vb = -0.5; io_val = V; c_band = 'Q1, Q2'; }
-                    else if (state.fbMode === 'st2') { vo = -V; va = -0.5; vb = 0.5; io_val = -V; c_band = 'Q3, Q4'; }
-                    else if (state.fbMode === 'st3') { vo = 0; va = 0.5; vb = 0.5; io_val = 0; c_band = 'Q1, Q3'; }
-                    else if (state.fbMode === 'st4') { vo = 0; va = -0.5; vb = -0.5; io_val = 0; c_band = 'Q2, Q4'; }
+                    if (state.fbMode === 'st1') { vo = V; va = 0.5; vb = -0.5; io_val = V; c_band = 'Q1, Q2 (STATIC)'; }
+                    else if (state.fbMode === 'st2') { vo = -V; va = -0.5; vb = 0.5; io_val = -V; c_band = 'Q3, Q4 (STATIC)'; }
+                    else if (state.fbMode === 'st3') { vo = 0; va = 0.5; vb = 0.5; io_val = 0; c_band = 'Q1, Q3 (SHORT)'; }
+                    else if (state.fbMode === 'st4') { vo = 0; va = -0.5; vb = -0.5; io_val = 0; c_band = 'Q2, Q4 (SHORT)'; }
                     else if (state.fbMode === 'st5') { vo = 0; va = 0; vb = 0; io_val = 0; c_band = 'ALL OFF'; }
                     
-                    arr.push({ deg, vo, va, vb, io: io_val, i1: 0, c_band });
+                    arr.push({ deg, vo, va, vb, io: io_val, i1: 0, i2: 0, c_band });
                     continue;
                 }
 
@@ -711,18 +726,21 @@
                 if (state.topology === 'half') {
                     if (activeState === 1) { 
                         c_band = io_val < -i_thresh ? 'D1' : 'Q1'; 
-                        i1 = io_val > 0 ? io_val : 0; // i1 only traces positive current through Q1
+                        i1 = io_val > 0 ? io_val : 0; 
                     }
                     else if (activeState === 2) { 
                         c_band = io_val > i_thresh ? 'D2' : 'Q2'; 
-                        i1 = 0; // Q1 is off
+                        i1 = 0; 
+                        i2 = io_val < 0 ? -io_val : 0; 
                     }
-                } else {
+                } else { // Full-bridge
                     if (activeState === 1) c_band = io_val < -i_thresh ? 'D1, D2' : 'Q1, Q2';
                     else if (activeState === 2) c_band = io_val > i_thresh ? 'D3, D4' : 'Q3, Q4';
+                    else if (activeState === 3) c_band = io_val > 0 ? 'D1, Q3 (Top Free)' : 'Q1, D3 (Top Free)';
+                    else if (activeState === 4) c_band = io_val > 0 ? 'Q2, D4 (Bot Free)' : 'D2, Q4 (Bot Free)';
                 }
 
-                arr.push({ deg, vo, va, vb, io: io_val, i1, c_band });
+                arr.push({ deg, vo, va, vb, io: io_val, i1, i2, c_band });
             }
             return arr;
         };
@@ -764,7 +782,8 @@
                     svg += `<path d="${d} L 720 ${center} L 0 ${center} Z" fill="${line.fill}" opacity="0.6"/>`;
                 }
                 
-                svg += `<path d="${d}" fill="none" stroke="${line.color}" stroke-width="${line.width || 2}" filter="url(#glow-intense)" ${line.dash ? `stroke-dasharray="${line.dash}"` : ''} stroke-linejoin="round" />`;
+                let glowAttr = line.glow ? 'filter="url(#glow-intense)"' : (line.sharp ? 'filter="url(#glow-intense)"' : '');
+                svg += `<path d="${d}" fill="none" stroke="${line.color}" stroke-width="${line.width || 2}" ${glowAttr} ${line.dash ? `stroke-dasharray="${line.dash}"` : ''} stroke-linejoin="round" />`;
             });
 
             if (showConduction) {
@@ -773,13 +792,12 @@
                 
                 const drawBand = (start, end, label) => {
                     const width = end - start;
-                    if (width < 2) return; // Ignore micro-bands
+                    if (width < 2) return; 
                     const midX = start + width / 2;
                     svg += `<rect x="${start}" y="${height + 5}" width="${width}" height="20" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" rx="4"/>`;
                     
-                    // Only draw text if the box is wide enough to prevent overlap
                     if (width >= 25) {
-                        let fSize = width < 45 ? 9 : 12; // Dynamic font sizing for thin slices
+                        let fSize = width < 50 ? 8 : 12; 
                         svg += `<text x="${midX}" y="${height + 19}" fill="#94a3b8" font-size="${fSize}" font-weight="bold" font-family="'JetBrains Mono', monospace" text-anchor="middle">${formatText(label)}</text>`;
                     }
                 }
@@ -848,10 +866,13 @@
                     { key: 'vo', color: 'var(--volt-color)', fill: 'rgba(255,42,95,0.15)', width: 2.5, sharp: true }
                 ], 150, 75, 100);
                 
-                // NEW: i1 waveform for Half-Bridge
-                svgsHTML += buildWaveChart("Transistor Current (i_1)", data, [
+                svgsHTML += buildWaveChart("Top Transistor Current (i_1)", data, [
                     { key: 'i1', color: '#a855f7', fill: 'rgba(168, 85, 247, 0.15)', width: 2, sharp: true }
-                ], 150, 120, 80);
+                ], 120, 100, 80);
+
+                svgsHTML += buildWaveChart("Bottom Transistor Current (i_2)", data, [
+                    { key: 'i2', color: '#ec4899', fill: 'rgba(236, 72, 153, 0.15)', width: 2, sharp: true }
+                ], 120, 100, 80);
 
             } else {
                 svgsHTML += buildWaveChart("Branch Voltage (v_ao)", data, [
@@ -874,12 +895,12 @@
             el.wrapper.innerHTML = svgsHTML;
         };
 
-        // Event Listeners
         el.sliderTau.addEventListener('input', e => { state.tau = parseInt(e.target.value); render(); });
         
         document.querySelectorAll('[data-top]').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                state.topology = e.target.dataset.top;
+                const targetBtn = e.target.closest('button');
+                state.topology = targetBtn.dataset.top;
                 render();
             });
         });
