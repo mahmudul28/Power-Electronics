@@ -99,7 +99,16 @@
 <body class="p-4 md:p-8 flex flex-col items-center">
 
     <div class="w-full max-w-[1400px] flex flex-col gap-6">
-        
+
+        <!-- Mobile Desktop-Site Warning -->
+        <div class="md:hidden flex items-start gap-3 rounded-xl p-4 bg-amber-500/10 border border-amber-500/40 text-amber-200">
+            <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            <div class="text-xs leading-relaxed">
+                <strong class="block mb-0.5">Best viewed on desktop</strong>
+                This simulator uses wide circuit diagrams and waveform charts (1000px+) that are hard to read on a phone screen. Please switch to "Desktop site" from your mobile browser's menu (⋮ or "aA") for the full experience.
+            </div>
+        </div>
+
         <!-- Header Section -->
         <div class="glass-panel rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center gap-6 relative overflow-hidden">
             <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_3s_infinite]"></div>
@@ -358,7 +367,9 @@
             halfMode: 'dynamic', // 'manual' (Q1/Q2 ticks) or 'dynamic' (auto square wave)
             q1On: false,
             q2On: false,
-            carryIo: 0 // last simulated load current, carried over between state/mode changes for realistic transients
+            carryIo: 0, // last simulated load current, carried over between state/mode changes for realistic transients
+            animTimer: null, // interval handle for circuit-diagram alternation in dynamic (non-frozen) modes
+            animPhase: 0
         };
 
         const el = {
@@ -990,6 +1001,30 @@
             }
         };
 
+        const stopCircuitAnim = () => {
+            if (state.animTimer) { clearInterval(state.animTimer); state.animTimer = null; }
+        };
+
+        // For non-frozen (dynamic) modes, no single instant is "the" state — but sitting on flat neutral
+        // gray forever looks inert next to the moving waveforms above it. So we alternate the diagram
+        // between the two representative conduction states (drawn straight from the already-computed,
+        // steady-state data), on the same cadence the textbook shows Mode 1 -> Mode 2.
+        const circuitDevicesForPhase = (data, phase) => {
+            const deg = phase === 0 ? 90 : 450; // mid-point of each half of the (pre-rolled) steady cycle
+            const pt = data.find(d => d.deg === deg) || data[0];
+            return new Set(pt.devices);
+        };
+
+        const startCircuitAnim = (data) => {
+            stopCircuitAnim();
+            state.animPhase = 0;
+            el.circuit.innerHTML = SVG_DEFS + drawCircuit(circuitDevicesForPhase(data, 0));
+            state.animTimer = setInterval(() => {
+                state.animPhase = state.animPhase === 0 ? 1 : 0;
+                el.circuit.innerHTML = SVG_DEFS + drawCircuit(circuitDevicesForPhase(data, state.animPhase));
+            }, 1200);
+        };
+
         const render = () => {
             updateButtons();
 
@@ -1003,7 +1038,12 @@
 
             updateMath(data, activeDevices);
 
-            el.circuit.innerHTML = SVG_DEFS + drawCircuit(activeDevices);
+            if (isFrozen) {
+                stopCircuitAnim();
+                el.circuit.innerHTML = SVG_DEFS + drawCircuit(activeDevices);
+            } else {
+                startCircuitAnim(data);
+            }
 
             let svgsHTML = SVG_DEFS;
 
