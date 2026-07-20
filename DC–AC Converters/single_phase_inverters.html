@@ -205,6 +205,26 @@
                     </div>
                 </div>
 
+                <!-- HALF-BRIDGE MANUAL SWITCH CONTROL (Hidden in Full-Bridge mode) -->
+                <div id="panel-hb-switches" class="hidden rounded-xl border border-white/10 bg-black/30 p-4 mb-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div class="flex items-center gap-5">
+                            <label class="flex items-center gap-2 cursor-pointer select-none group">
+                                <input type="checkbox" id="chk-q1" class="w-4 h-4 accent-emerald-500 cursor-pointer">
+                                <span class="text-sm font-bold text-slate-200 group-hover:text-white">Q<span class="sub">1</span> (Top)</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer select-none group">
+                                <input type="checkbox" id="chk-q2" class="w-4 h-4 accent-emerald-500 cursor-pointer">
+                                <span class="text-sm font-bold text-slate-200 group-hover:text-white">Q<span class="sub">2</span> (Bottom)</span>
+                            </label>
+                        </div>
+                        <button id="btn-hb-dynamic" class="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all duration-300 bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white">
+                            ▶ Dynamic Square-Wave (Auto)
+                        </button>
+                    </div>
+                    <p id="hb-switch-note" class="text-[10px] text-slate-500 mt-3 leading-relaxed">Both switches start <strong class="text-slate-300">OFF</strong>. Tick a box to gate that transistor ON and see the effect on the circuit &amp; waveforms below. <span class="text-slate-400">Q<span class="sub">1</span> &amp; Q<span class="sub">2</span> are interlocked</span> — turning one ON automatically turns the other OFF to prevent a shoot-through short circuit across the DC bus.</p>
+                </div>
+
                 <!-- TABLE 6.1 (Hidden in Half-Bridge mode) -->
                 <div id="table-container" class="hidden overflow-x-auto rounded-xl border border-white/10 bg-black/30">
                     <div class="p-2 bg-white/5 border-b border-white/10 text-center">
@@ -334,7 +354,11 @@
         const state = {
             topology: 'half',
             tau: 300, 
-            fbMode: 'dynamic' // dynamic, mod_sq, mod_sq_top, mod_sq_bot, st1-st5
+            fbMode: 'dynamic', // dynamic, mod_sq, mod_sq_top, mod_sq_bot, st1-st5
+            halfMode: 'dynamic', // 'manual' (Q1/Q2 ticks) or 'dynamic' (auto square wave)
+            q1On: false,
+            q2On: false,
+            carryIo: 0 // last simulated load current, carried over between state/mode changes for realistic transients
         };
 
         const el = {
@@ -349,7 +373,11 @@
             eqFund: document.getElementById('eq-fund'),
             panelFbModes: document.getElementById('panel-fb-modes'),
             statusSwitches: document.getElementById('status-switches'),
-            tableContainer: document.getElementById('table-container')
+            tableContainer: document.getElementById('table-container'),
+            panelHbSwitches: document.getElementById('panel-hb-switches'),
+            chkQ1: document.getElementById('chk-q1'),
+            chkQ2: document.getElementById('chk-q2'),
+            btnHbDynamic: document.getElementById('btn-hb-dynamic')
         };
 
         const _Q1 = '<span class="whitespace-nowrap">Q<span class="sub">1</span></span>';
@@ -429,11 +457,24 @@
             </defs>
         </svg>`;
 
-        const drawCircuit = () => {
+        // Returns SVG attribute string for a given device (e.g. 'Q1', 'D2').
+        // activeDevices === null  -> neutral/default styling (used for animated/dynamic modes where no single instant is highlighted)
+        // activeDevices = Set     -> devices in the set are colored ON (green glow); all others are dimmed OFF (gray)
+        const deviceAttr = (name, activeDevices) => {
+            const deviceDefault = "#cbd5e1";
+            const onColor = "#22c55e";
+            const offColor = "#475569";
+            if (!activeDevices) return `fill="${deviceDefault}" stroke="${deviceDefault}"`;
+            if (activeDevices.has(name)) return `fill="${onColor}" stroke="${onColor}" filter="url(#glow-intense)"`;
+            return `fill="${offColor}" stroke="${offColor}" opacity="0.4"`;
+        };
+
+        const drawCircuit = (activeDevices = null) => {
             const wire = "#64748b";
             const device = "#cbd5e1";
             const loadCol = "#f59e0b";
             const currCol = "#00f0ff"; 
+            const da = (name) => deviceAttr(name, activeDevices);
             
             let svg = `<svg viewBox="0 0 600 280" class="w-full h-auto">`;
             
@@ -473,11 +514,11 @@
                 <text x="325" y="120" fill="${loadCol}" font-size="14" font-weight="bold" font-style="italic">${formatText('i_o')}</text>
 
                 <path d="M 360,60 L 360,80 M 360,120 L 360,160 M 360,200 L 360,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
-                <use href="#diode-up" x="360" y="100" fill="${device}" stroke="${device}"/>
-                <text x="330" y="105" fill="${device}" font-size="14" font-weight="bold">${formatText('D_1')}</text>
+                <use href="#diode-up" x="360" y="100" ${da('D1')}/>
+                <text x="330" y="105" fill="${activeDevices ? (activeDevices.has('D1') ? '#22c55e' : '#475569') : device}" font-size="14" font-weight="bold">${formatText('D_1')}</text>
                 
-                <use href="#diode-up" x="360" y="180" fill="${device}" stroke="${device}"/>
-                <text x="330" y="185" fill="${device}" font-size="14" font-weight="bold">${formatText('D_2')}</text>
+                <use href="#diode-up" x="360" y="180" ${da('D2')}/>
+                <text x="330" y="185" fill="${activeDevices ? (activeDevices.has('D2') ? '#22c55e' : '#475569') : device}" font-size="14" font-weight="bold">${formatText('D_2')}</text>
                 
                 <circle cx="360" cy="140" r="4" fill="${wire}"/>
                 <text x="370" y="155" fill="${device}" font-size="14" font-weight="bold">a</text>
@@ -485,11 +526,11 @@
                 <path d="M 360,140 L 440,140" fill="none" stroke="${wire}" stroke-width="2.5"/>
 
                 <path d="M 440,60 L 440,80 M 440,120 L 440,160 M 440,200 L 440,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
-                <use href="#transistor-r" x="430" y="100" fill="${device}" stroke="${device}"/>
-                <text x="455" y="105" fill="${device}" font-size="14" font-weight="bold">${formatText('Q_1')}</text>
+                <use href="#transistor-r" x="430" y="100" ${da('Q1')}/>
+                <text x="455" y="105" fill="${activeDevices ? (activeDevices.has('Q1') ? '#22c55e' : '#475569') : device}" font-size="14" font-weight="bold">${formatText('Q_1')}</text>
                 
-                <use href="#transistor-r" x="430" y="180" fill="${device}" stroke="${device}"/>
-                <text x="455" y="185" fill="${device}" font-size="14" font-weight="bold">${formatText('Q_2')}</text>
+                <use href="#transistor-r" x="430" y="180" ${da('Q2')}/>
+                <text x="455" y="185" fill="${activeDevices ? (activeDevices.has('Q2') ? '#22c55e' : '#475569') : device}" font-size="14" font-weight="bold">${formatText('Q_2')}</text>
                 
                 <circle cx="440" cy="140" r="4" fill="${wire}"/>
                 `;
@@ -515,20 +556,20 @@
                 <text x="75" y="185" fill="${device}" font-size="12">${formatText('V_s/2')}</text>
 
                 <path d="M 200,60 L 200,80 M 200,120 L 200,160 M 200,200 L 200,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
-                <use href="#transistor-l" x="210" y="100" fill="${device}" stroke="${device}"/>
-                <text x="165" y="105" fill="${device}" font-size="14" font-weight="bold">${formatText('Q_1')}</text>
+                <use href="#transistor-l" x="210" y="100" ${da('Q1')}/>
+                <text x="165" y="105" fill="${activeDevices ? (activeDevices.has('Q1') ? '#22c55e' : '#475569') : device}" font-size="14" font-weight="bold">${formatText('Q_1')}</text>
 
-                <use href="#transistor-l" x="210" y="180" fill="${device}" stroke="${device}"/>
-                <text x="165" y="185" fill="${device}" font-size="14" font-weight="bold">${formatText('Q_4')}</text>
+                <use href="#transistor-l" x="210" y="180" ${da('Q4')}/>
+                <text x="165" y="185" fill="${activeDevices ? (activeDevices.has('Q4') ? '#22c55e' : '#475569') : device}" font-size="14" font-weight="bold">${formatText('Q_4')}</text>
                 <circle cx="200" cy="140" r="4" fill="${wire}"/>
 
                 <path d="M 200,140 L 260,140" fill="none" stroke="${wire}" stroke-width="2.5"/>
                 <path d="M 260,60 L 260,80 M 260,120 L 260,160 M 260,200 L 260,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
-                <use href="#diode-up" x="260" y="100" fill="${device}" stroke="${device}"/>
-                <text x="280" y="105" fill="${device}" font-size="14" font-weight="bold">${formatText('D_1')}</text>
+                <use href="#diode-up" x="260" y="100" ${da('D1')}/>
+                <text x="280" y="105" fill="${activeDevices ? (activeDevices.has('D1') ? '#22c55e' : '#475569') : device}" font-size="14" font-weight="bold">${formatText('D_1')}</text>
 
-                <use href="#diode-up" x="260" y="180" fill="${device}" stroke="${device}"/>
-                <text x="280" y="185" fill="${device}" font-size="14" font-weight="bold">${formatText('D_4')}</text>
+                <use href="#diode-up" x="260" y="180" ${da('D4')}/>
+                <text x="280" y="185" fill="${activeDevices ? (activeDevices.has('D4') ? '#22c55e' : '#475569') : device}" font-size="14" font-weight="bold">${formatText('D_4')}</text>
                 <circle cx="260" cy="140" r="4" fill="${wire}"/>
                 <text x="245" y="155" fill="${device}" font-size="14" font-weight="bold">a</text>
 
@@ -541,21 +582,21 @@
                 <text x="390" y="175" fill="${loadCol}" font-size="14" font-weight="bold" font-style="italic">${formatText('i_o')}</text>
 
                 <path d="M 460,60 L 460,80 M 460,120 L 460,160 M 460,200 L 460,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
-                <use href="#diode-up" x="460" y="100" fill="${device}" stroke="${device}"/>
-                <text x="420" y="105" fill="${device}" font-size="14" font-weight="bold">${formatText('D_3')}</text>
+                <use href="#diode-up" x="460" y="100" ${da('D3')}/>
+                <text x="420" y="105" fill="${activeDevices ? (activeDevices.has('D3') ? '#22c55e' : '#475569') : device}" font-size="14" font-weight="bold">${formatText('D_3')}</text>
 
-                <use href="#diode-up" x="460" y="180" fill="${device}" stroke="${device}"/>
-                <text x="420" y="185" fill="${device}" font-size="14" font-weight="bold">${formatText('D_2')}</text>
+                <use href="#diode-up" x="460" y="180" ${da('D2')}/>
+                <text x="420" y="185" fill="${activeDevices ? (activeDevices.has('D2') ? '#22c55e' : '#475569') : device}" font-size="14" font-weight="bold">${formatText('D_2')}</text>
                 <circle cx="460" cy="140" r="4" fill="${wire}"/>
                 <text x="470" y="155" fill="${device}" font-size="14" font-weight="bold">b</text>
                 
                 <path d="M 460,140 L 520,140" fill="none" stroke="${wire}" stroke-width="2.5"/>
                 <path d="M 520,60 L 520,80 M 520,120 L 520,160 M 520,200 L 520,220" fill="none" stroke="${wire}" stroke-width="2.5"/>
-                <use href="#transistor-r" x="510" y="100" fill="${device}" stroke="${device}"/>
-                <text x="535" y="105" fill="${device}" font-size="14" font-weight="bold">${formatText('Q_3')}</text>
+                <use href="#transistor-r" x="510" y="100" ${da('Q3')}/>
+                <text x="535" y="105" fill="${activeDevices ? (activeDevices.has('Q3') ? '#22c55e' : '#475569') : device}" font-size="14" font-weight="bold">${formatText('Q_3')}</text>
 
-                <use href="#transistor-r" x="510" y="180" fill="${device}" stroke="${device}"/>
-                <text x="535" y="185" fill="${device}" font-size="14" font-weight="bold">${formatText('Q_2')}</text>
+                <use href="#transistor-r" x="510" y="180" ${da('Q2')}/>
+                <text x="535" y="185" fill="${activeDevices ? (activeDevices.has('Q2') ? '#22c55e' : '#475569') : device}" font-size="14" font-weight="bold">${formatText('Q_2')}</text>
                 <circle cx="520" cy="140" r="4" fill="${wire}"/>
                 `;
             }
@@ -563,11 +604,19 @@
             return svg;
         }
 
-        const updateMath = () => {
+        const updateMath = (data, activeDevices) => {
             let switchText = '';
 
             if (state.topology === 'half') {
-                switchText = `<strong>Half-Bridge Operation:</strong><br>+ Half-Cycle: ${_Q1} or ${_D1} conducts.<br>- Half-Cycle: ${_Q2} or ${_D2} conducts.`;
+                if (state.halfMode === 'dynamic') {
+                    switchText = `<strong>Half-Bridge Operation (Auto):</strong><br>+ Half-Cycle: ${_Q1} or ${_D1} conducts.<br>- Half-Cycle: ${_Q2} or ${_D2} conducts.`;
+                } else if (state.q1On && !state.q2On) {
+                    switchText = `<strong>Manual State: Q<span class="sub">1</span> ON</strong><br><span class="text-emerald-400">ON: ${_Q1}</span><br><span class="text-xs text-slate-400 mt-1 block">Output settling to +V<sub>s</sub>/2. Conducting: ${data ? data[data.length-1].c_band.replace(/Q(\d)/g,'Q<span class="sub">$1</span>').replace(/D(\d)/g,'D<span class="sub">$1</span>') : ''}</span>`;
+                } else if (state.q2On && !state.q1On) {
+                    switchText = `<strong>Manual State: Q<span class="sub">2</span> ON</strong><br><span class="text-emerald-400">ON: ${_Q2}</span><br><span class="text-xs text-slate-400 mt-1 block">Output settling to -V<sub>s</sub>/2. Conducting: ${data ? data[data.length-1].c_band.replace(/Q(\d)/g,'Q<span class="sub">$1</span>').replace(/D(\d)/g,'D<span class="sub">$1</span>') : ''}</span>`;
+                } else {
+                    switchText = `<strong>Manual State: Both OFF</strong><br><span class="text-rose-400 font-bold">${_Q1} &amp; ${_Q2} OFF</span><br><span class="text-xs text-slate-400 mt-1 block">Load current freewheels to 0 via ${data ? data[data.length-1].c_band.replace(/Q(\d)/g,'Q<span class="sub">$1</span>').replace(/D(\d)/g,'D<span class="sub">$1</span>') : 'the diodes'}.</span>`;
+                }
                 
                 el.eqFourier.innerHTML = `
                     <div class="flex items-center gap-2 justify-center">
@@ -645,16 +694,124 @@
             el.statusSwitches.innerHTML = switchText;
         }
 
+        const I_THRESH = 0.02;
+
+        // Which device(s) ACTUALLY carry the load current right now (transistor if forward-biased by
+        // the commanded gate + current direction, otherwise its antiparallel diode). Matches Table 6.1.
+        const conductionHalf = (activeState, io) => {
+            if (activeState === 1) return io < -I_THRESH ? ['D1'] : ['Q1'];
+            if (activeState === 2) return io > I_THRESH ? ['D2'] : ['Q2'];
+            // activeState === 0 -> both switches gated OFF: current can only freewheel through a diode
+            if (io > I_THRESH) return ['D2'];
+            if (io < -I_THRESH) return ['D1'];
+            return [];
+        };
+
+        const conductionFull = (activeState, io) => {
+            if (activeState === 1) return io < -I_THRESH ? ['D1', 'D2'] : ['Q1', 'Q2'];
+            if (activeState === 2) return io > I_THRESH ? ['D3', 'D4'] : ['Q3', 'Q4'];
+            // State 3 (Q1,Q3 on / top rail shorted): io>0 -> Q1 & D3 ; io<0 -> D1 & Q3  (Table 6.1)
+            if (activeState === 3) {
+                if (io > I_THRESH) return ['Q1', 'D3'];
+                if (io < -I_THRESH) return ['D1', 'Q3'];
+                return ['Q1', 'Q3']; // both gated closed, essentially no current flowing yet
+            }
+            // State 4 (Q2,Q4 on / bottom rail shorted): io>0 -> D4 & Q2 ; io<0 -> Q4 & D2 (Table 6.1)
+            if (activeState === 4) {
+                if (io > I_THRESH) return ['D4', 'Q2'];
+                if (io < -I_THRESH) return ['Q4', 'D2'];
+                return ['Q2', 'Q4']; // both gated closed, essentially no current flowing yet
+            }
+            // activeState === 5 -> all four switches OFF: current can only freewheel through two diodes
+            if (io > I_THRESH) return ['D4', 'D3'];
+            if (io < -I_THRESH) return ['D1', 'D2'];
+            return [];
+        };
+
+        const bandTag = (topology, activeState) => {
+            if (topology !== 'full') return '';
+            if (activeState === 3) return ' (Top Free)';
+            if (activeState === 4) return ' (Bot Free)';
+            if (activeState === 5) return ' (Freewheel)';
+            return '';
+        };
+
+        const bandLabel = (topology, activeState, devices) => devices.length
+            ? devices.join(', ') + bandTag(topology, activeState)
+            : 'None (i_o = 0)';
+
         const computeData = () => {
             const arr = [];
-            const tauDegrees = state.tau; 
-            const V = state.topology === 'half' ? 0.5 : 1.0; 
-            
-            let io_val = 0;
+            const V = state.topology === 'half' ? 0.5 : 1.0;
             const dt = 1;
-            const tau = tauDegrees < 2 ? 0.001 : tauDegrees;
+            const tau = state.tau < 2 ? 0.001 : state.tau;
+            const step = (cur, target) => (state.tau < 2 ? target : cur + (target - cur) * (dt / tau));
 
-            const getStep = (deg, isPreroll = false) => {
+            const isHalfManual = state.topology === 'half' && state.halfMode === 'manual';
+            const isFullStatic = state.topology === 'full' && state.fbMode.startsWith('st');
+
+            // ---------------------------------------------------------------
+            // FROZEN / MANUAL STATES: current realistically charges toward or
+            // decays away from its target via the RL time constant (tau),
+            // continuing on from wherever the current last settled (carryIo)
+            // instead of snapping instantly — this is what makes the chart show
+            // a real transient instead of a flat static line.
+            // ---------------------------------------------------------------
+            if (isHalfManual || isFullStatic) {
+                let io_val = state.carryIo;
+                let activeState, fixedVo = null, fixedVa = null, fixedVb = null, target;
+
+                if (isHalfManual) {
+                    if (state.q1On && !state.q2On) { activeState = 1; fixedVa = V; target = V; }
+                    else if (state.q2On && !state.q1On) { activeState = 2; fixedVa = -V; target = -V; }
+                    else { activeState = 0; target = 0; } // both off -> voltage floats with current direction
+                } else {
+                    if (state.fbMode === 'st1') { activeState = 1; fixedVa = 0.5; fixedVb = -0.5; target = V; }
+                    else if (state.fbMode === 'st2') { activeState = 2; fixedVa = -0.5; fixedVb = 0.5; target = -V; }
+                    else if (state.fbMode === 'st3') { activeState = 3; fixedVa = 0.5; fixedVb = 0.5; target = 0; }
+                    else if (state.fbMode === 'st4') { activeState = 4; fixedVa = -0.5; fixedVb = -0.5; target = 0; }
+                    else { activeState = 5; target = 0; } // st5, all off -> voltage floats with current direction
+                }
+
+                for (let deg = 0; deg <= 720; deg++) {
+                    if (deg > 0) io_val = step(io_val, target);
+
+                    let devices, vo, va, vb;
+                    if (isHalfManual) {
+                        devices = conductionHalf(activeState, io_val);
+                        if (activeState === 0) {
+                            va = io_val > I_THRESH ? -V : (io_val < -I_THRESH ? V : 0);
+                        } else {
+                            va = fixedVa;
+                        }
+                        vo = va; vb = 0;
+                    } else {
+                        devices = conductionFull(activeState, io_val);
+                        if (activeState === 5) {
+                            va = io_val > I_THRESH ? -0.5 : (io_val < -I_THRESH ? 0.5 : 0);
+                            vb = io_val > I_THRESH ? 0.5 : (io_val < -I_THRESH ? -0.5 : 0);
+                        } else {
+                            va = fixedVa; vb = fixedVb;
+                        }
+                        vo = va - vb;
+                    }
+
+                    let i1 = 0, i2 = 0;
+                    if (isHalfManual) {
+                        if (activeState === 1) i1 = io_val > I_THRESH ? io_val : 0;
+                        else if (activeState === 2) i2 = io_val < -I_THRESH ? -io_val : 0;
+                    }
+
+                    arr.push({ deg, vo, va, vb, io: io_val, i1, i2, c_band: bandLabel(state.topology, activeState, devices), devices });
+                }
+                state.carryIo = io_val;
+                return arr;
+            }
+
+            // ---------------------------------------------------------------
+            // DYNAMIC / PERIODIC MODES (auto square wave, modified square wave)
+            // ---------------------------------------------------------------
+            const getStep = (deg) => {
                 let modDeg = deg % 360;
                 let vo=0, va=0, vb=0, activeState=0;
 
@@ -688,60 +845,30 @@
                 return { vo, va, vb, activeState };
             };
 
-            // Pre-roll to stabilize inductor
-            if (!state.fbMode.startsWith('st')) {
-                for (let i = 0; i < 360 * 5; i++) {
-                    let { vo } = getStep(i, true);
-                    if (tauDegrees < 2) io_val = vo;
-                    else io_val += (vo - io_val) * (dt / tau);
-                }
+            // Pre-roll to stabilize inductor into periodic steady-state before we start plotting
+            let io_val = 0;
+            for (let i = 0; i < 360 * 5; i++) {
+                let { vo } = getStep(i);
+                io_val = step(io_val, vo);
             }
 
             for (let deg = 0; deg <= 720; deg += 1) {
-                let vo=0, va=0, vb=0, activeState=0, c_band='', i1=0, i2=0;
+                let s = getStep(deg);
+                let vo = s.vo, va = s.va, vb = s.vb, activeState = s.activeState;
+                io_val = step(io_val, vo);
 
-                // Handle static frozen states
-                if (state.topology === 'full' && state.fbMode.startsWith('st')) {
-                    if (state.fbMode === 'st1') { vo = V; va = 0.5; vb = -0.5; io_val = V; c_band = 'Q1, Q2 (STATIC)'; }
-                    else if (state.fbMode === 'st2') { vo = -V; va = -0.5; vb = 0.5; io_val = -V; c_band = 'Q3, Q4 (STATIC)'; }
-                    else if (state.fbMode === 'st3') { vo = 0; va = 0.5; vb = 0.5; io_val = 0; c_band = 'Q1, Q3 (SHORT)'; }
-                    else if (state.fbMode === 'st4') { vo = 0; va = -0.5; vb = -0.5; io_val = 0; c_band = 'Q2, Q4 (SHORT)'; }
-                    else if (state.fbMode === 'st5') { vo = 0; va = 0; vb = 0; io_val = 0; c_band = 'ALL OFF'; }
-                    
-                    arr.push({ deg, vo, va, vb, io: io_val, i1: 0, i2: 0, c_band });
-                    continue;
-                }
-
-                let step = getStep(deg, false);
-                vo = step.vo; va = step.va; vb = step.vb; activeState = step.activeState;
-                
-                if (tauDegrees < 2) {
-                    io_val = vo;
-                } else {
-                    io_val += (vo - io_val) * (dt / tau);
-                }
-                
-                const i_thresh = 0.02;
-                
+                let devices, i1 = 0, i2 = 0;
                 if (state.topology === 'half') {
-                    if (activeState === 1) { 
-                        c_band = io_val < -i_thresh ? 'D1' : 'Q1'; 
-                        i1 = io_val > 0 ? io_val : 0; 
-                    }
-                    else if (activeState === 2) { 
-                        c_band = io_val > i_thresh ? 'D2' : 'Q2'; 
-                        i1 = 0; 
-                        i2 = io_val < 0 ? -io_val : 0; 
-                    }
-                } else { // Full-bridge
-                    if (activeState === 1) c_band = io_val < -i_thresh ? 'D1, D2' : 'Q1, Q2';
-                    else if (activeState === 2) c_band = io_val > i_thresh ? 'D3, D4' : 'Q3, Q4';
-                    else if (activeState === 3) c_band = io_val > 0 ? 'D1, Q3 (Top Free)' : 'Q1, D3 (Top Free)';
-                    else if (activeState === 4) c_band = io_val > 0 ? 'Q2, D4 (Bot Free)' : 'D2, Q4 (Bot Free)';
+                    devices = conductionHalf(activeState, io_val);
+                    if (activeState === 1) i1 = io_val > I_THRESH ? io_val : 0;
+                    else if (activeState === 2) i2 = io_val < -I_THRESH ? -io_val : 0;
+                } else {
+                    devices = conductionFull(activeState, io_val);
                 }
 
-                arr.push({ deg, vo, va, vb, io: io_val, i1, i2, c_band });
+                arr.push({ deg, vo, va, vb, io: io_val, i1, i2, c_band: bandLabel(state.topology, activeState, devices), devices });
             }
+            state.carryIo = io_val;
             return arr;
         };
 
@@ -846,19 +973,38 @@
             if (state.topology === 'full') {
                 el.panelFbModes.classList.remove('hidden');
                 el.tableContainer.classList.remove('hidden');
+                el.panelHbSwitches.classList.add('hidden');
             } else {
                 el.panelFbModes.classList.add('hidden');
                 el.tableContainer.classList.add('hidden');
+                el.panelHbSwitches.classList.remove('hidden');
+            }
+
+            // Sync half-bridge manual switch controls
+            el.chkQ1.checked = state.q1On;
+            el.chkQ2.checked = state.q2On;
+            if (state.halfMode === 'dynamic') {
+                el.btnHbDynamic.className = 'px-3 py-1.5 rounded-lg border text-xs font-bold transition-all duration-300 active-btn';
+            } else {
+                el.btnHbDynamic.className = 'px-3 py-1.5 rounded-lg border text-xs font-bold transition-all duration-300 bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white';
             }
         };
 
         const render = () => {
             updateButtons();
-            updateMath();
-            
-            el.circuit.innerHTML = SVG_DEFS + drawCircuit();
 
             const data = computeData();
+
+            // Only highlight actual switch/diode state for FROZEN views (a single held state) —
+            // for continuously-alternating dynamic modes no single instant represents the whole waveform.
+            const isFrozen = (state.topology === 'half' && state.halfMode === 'manual')
+                || (state.topology === 'full' && state.fbMode.startsWith('st'));
+            const activeDevices = isFrozen ? new Set(data[data.length - 1].devices) : null;
+
+            updateMath(data, activeDevices);
+
+            el.circuit.innerHTML = SVG_DEFS + drawCircuit(activeDevices);
+
             let svgsHTML = SVG_DEFS;
 
             if (state.topology === 'half') {
@@ -900,7 +1046,9 @@
         document.querySelectorAll('[data-top]').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const targetBtn = e.target.closest('button');
+                if (targetBtn.dataset.top === state.topology) return;
                 state.topology = targetBtn.dataset.top;
+                state.carryIo = 0; // fresh circuit context on topology change
                 render();
             });
         });
@@ -910,6 +1058,27 @@
                 state.fbMode = e.target.dataset.fb;
                 render();
             });
+        });
+
+        // Half-bridge manual Q1/Q2 switches: mutually exclusive (real deadtime interlock — Q1 & Q2
+        // ON at the same time would short the DC bus straight through), default both OFF.
+        el.chkQ1.addEventListener('change', (e) => {
+            state.halfMode = 'manual';
+            state.q1On = e.target.checked;
+            if (state.q1On) state.q2On = false;
+            render();
+        });
+        el.chkQ2.addEventListener('change', (e) => {
+            state.halfMode = 'manual';
+            state.q2On = e.target.checked;
+            if (state.q2On) state.q1On = false;
+            render();
+        });
+        el.btnHbDynamic.addEventListener('click', () => {
+            state.halfMode = 'dynamic';
+            state.q1On = false;
+            state.q2On = false;
+            render();
         });
 
         // Initialize
