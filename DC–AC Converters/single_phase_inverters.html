@@ -807,13 +807,22 @@
                         vo = va - vb;
                     }
 
-                    let i1 = 0, i2 = 0;
+                    let i1 = 0, i2 = 0, iQ1 = 0, iQ2 = 0, iQ3 = 0, iQ4 = 0;
                     if (isHalfManual) {
                         if (activeState === 1) i1 = io_val > I_THRESH ? io_val : 0;
                         else if (activeState === 2) i2 = io_val < -I_THRESH ? -io_val : 0;
+                    } else {
+                        // Each transistor only ever carries current in one direction (per Table 6.1):
+                        // Q1/Q2 conduct the positive half of i_o, Q3/Q4 conduct the negative half
+                        // (as a positive magnitude). Whether it's actually the transistor or its
+                        // antiparallel diode doing the conducting right now comes from `devices`.
+                        if (devices.includes('Q1')) iQ1 = Math.max(io_val, 0);
+                        if (devices.includes('Q2')) iQ2 = Math.max(io_val, 0);
+                        if (devices.includes('Q3')) iQ3 = Math.max(-io_val, 0);
+                        if (devices.includes('Q4')) iQ4 = Math.max(-io_val, 0);
                     }
 
-                    arr.push({ deg, vo, va, vb, io: io_val, i1, i2, c_band: bandLabel(state.topology, activeState, devices), devices });
+                    arr.push({ deg, vo, va, vb, io: io_val, i1, i2, iQ1, iQ2, iQ3, iQ4, c_band: bandLabel(state.topology, activeState, devices), devices });
                 }
                 state.carryIo = io_val;
                 return arr;
@@ -868,16 +877,20 @@
                 let vo = s.vo, va = s.va, vb = s.vb, activeState = s.activeState;
                 io_val = step(io_val, vo);
 
-                let devices, i1 = 0, i2 = 0;
+                let devices, i1 = 0, i2 = 0, iQ1 = 0, iQ2 = 0, iQ3 = 0, iQ4 = 0;
                 if (state.topology === 'half') {
                     devices = conductionHalf(activeState, io_val);
                     if (activeState === 1) i1 = io_val > I_THRESH ? io_val : 0;
                     else if (activeState === 2) i2 = io_val < -I_THRESH ? -io_val : 0;
                 } else {
                     devices = conductionFull(activeState, io_val);
+                    if (devices.includes('Q1')) iQ1 = Math.max(io_val, 0);
+                    if (devices.includes('Q2')) iQ2 = Math.max(io_val, 0);
+                    if (devices.includes('Q3')) iQ3 = Math.max(-io_val, 0);
+                    if (devices.includes('Q4')) iQ4 = Math.max(-io_val, 0);
                 }
 
-                arr.push({ deg, vo, va, vb, io: io_val, i1, i2, c_band: bandLabel(state.topology, activeState, devices), devices });
+                arr.push({ deg, vo, va, vb, io: io_val, i1, i2, iQ1, iQ2, iQ3, iQ4, c_band: bandLabel(state.topology, activeState, devices), devices });
             }
             state.carryIo = io_val;
             return arr;
@@ -1072,6 +1085,22 @@
                 svgsHTML += buildWaveChart("Output Voltage (v_ab = v_ao - v_bo)", data, [
                     { key: 'vo', color: 'var(--volt-color)', fill: 'rgba(255,42,95,0.15)', width: 2.5, sharp: true }
                 ], 150, 75, 60);
+
+                svgsHTML += buildWaveChart("Transistor Current (i_Q1)", data, [
+                    { key: 'iQ1', color: '#a855f7', fill: 'rgba(168, 85, 247, 0.15)', width: 2, sharp: true }
+                ], 120, 100, 80);
+
+                svgsHTML += buildWaveChart("Transistor Current (i_Q2)", data, [
+                    { key: 'iQ2', color: '#ec4899', fill: 'rgba(236, 72, 153, 0.15)', width: 2, sharp: true }
+                ], 120, 100, 80);
+
+                svgsHTML += buildWaveChart("Transistor Current (i_Q3)", data, [
+                    { key: 'iQ3', color: '#22d3ee', fill: 'rgba(34, 211, 238, 0.15)', width: 2, sharp: true }
+                ], 120, 100, 80);
+
+                svgsHTML += buildWaveChart("Transistor Current (i_Q4)", data, [
+                    { key: 'iQ4', color: '#facc15', fill: 'rgba(250, 204, 21, 0.15)', width: 2, sharp: true }
+                ], 120, 100, 80);
             }
 
             svgsHTML += buildWaveChart("Load Current (i_o)", data, [
