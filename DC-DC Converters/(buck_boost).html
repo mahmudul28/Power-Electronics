@@ -206,9 +206,9 @@
                 <div class="bg-black/20 p-3 rounded-xl border border-slate-400/20">
                     <div class="flex justify-between mb-2">
                         <span class="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Load (R)</span>
-                        <span class="mono text-slate-300 font-bold text-[11px]" id="val-R">10 Ω</span>
+                        <span class="mono text-slate-300 font-bold text-[11px]" id="val-R">30 Ω</span>
                     </div>
-                    <input type="range" id="slider-R" min="2" max="100" step="1" value="10" class="slider-zoom" style="color:#f8fafc;">
+                    <input type="range" id="slider-R" min="2" max="100" step="1" value="30" class="slider-zoom" style="color:#f8fafc;">
                 </div>
                 <div class="bg-black/20 p-3 rounded-xl border border-rose-500/20">
                     <div class="flex justify-between mb-2">
@@ -288,7 +288,7 @@
             L_uH: 1000,
             C_uF: 100,
             fsw_kHz: 20,
-            R: 10,
+            R: 30,
             rds_mOhm: 150,
             vf: 0.7,
             lastData: null,
@@ -397,6 +397,12 @@
                     <line x1="-20" y1="0" x2="-10" y2="0" stroke="currentColor" stroke-width="2.5"/>
                     <line x1="10" y1="0" x2="20" y2="0" stroke="currentColor" stroke-width="2.5"/>
                 </g>
+                <g id="dio-l">
+                    <polygon points="10,-10 -10,0 10,10" fill="currentColor"/>
+                    <line x1="-10" y1="-10" x2="-10" y2="10" stroke="currentColor" stroke-width="2.5"/>
+                    <line x1="10" y1="0" x2="20" y2="0" stroke="currentColor" stroke-width="2.5"/>
+                    <line x1="-20" y1="0" x2="-10" y2="0" stroke="currentColor" stroke-width="2.5"/>
+                </g>
                 <!-- Inductor -->
                 <g id="ind-h">
                     <path d="M -20,0 L -15,0 C -15,-12 -5,-12 -5,0 C -5,-12 5,-12 5,0 C 5,-12 15,-12 15,0 L 20,0" fill="none" stroke="currentColor" stroke-width="2.5"/>
@@ -475,7 +481,7 @@
                     <text x="430" y="30" fill="${colors.cap}" font-size="14" font-weight="bold" text-anchor="middle">C</text>
 
                     ${flowArrow(160, 50, 'r', colors.sw)}${curLabel(160, 42, colors.sw, 'i', 'SW')}
-                    ${flowArrow(270, 90, 'd', colors.dio)}${curLabel(288, 95, colors.dio, 'i', 'D')}
+                    ${flowArrow(270, 90, 'u', colors.dio)}${curLabel(288, 95, colors.dio, 'i', 'D')}
                     ${flowArrow(410, 50, 'r', colors.ind)}${curLabel(410, 42, colors.ind, 'i', 'L')}
                     ${flowArrow(465, 50, 'r', colors.out)}${curLabel(465, 42, colors.out, 'i', 'o')}
                     ${flowArrow(430, 88, 'd', colors.cap)}${curLabel(448, 93, colors.cap, 'i', 'C')}
@@ -517,15 +523,14 @@
                     <use href="#ind-v" x="250" y="100" fill="${colors.ind}" stroke="${colors.ind}" filter="url(#glow)"/>
                     <text x="225" y="105" fill="${colors.ind}" font-size="14" font-weight="bold" text-anchor="middle">L</text>
                     
-                    <use href="#dio-r" x="320" y="50" fill="${colors.dio}" stroke="${colors.dio}" filter="url(#glow)"/>
-                    <text x="320" y="30" fill="${colors.dio}" font-size="11" font-weight="bold" text-anchor="middle">(Reversed)</text>
+                    <use href="#dio-l" x="320" y="50" fill="${colors.dio}" stroke="${colors.dio}" filter="url(#glow)"/>
                     
                     <use href="#cap-v" x="430" y="100" fill="${colors.cap}" stroke="${colors.cap}"/>
                     <text x="430" y="30" fill="${colors.cap}" font-size="14" font-weight="bold" text-anchor="middle">C</text>
 
                     ${flowArrow(160, 50, 'r', colors.sw)}${curLabel(160, 42, colors.sw, 'i', 'SW')}
                     ${flowArrow(250, 88, 'd', colors.ind)}${curLabel(232, 93, colors.ind, 'i', 'L')}
-                    ${flowArrow(380, 50, 'r', colors.dio)}${curLabel(380, 42, colors.dio, 'i', 'D')}
+                    ${flowArrow(380, 50, 'l', colors.dio)}${curLabel(380, 42, colors.dio, 'i', 'D')}
                     ${flowArrow(465, 50, 'r', colors.out)}${curLabel(465, 42, colors.out, 'i', 'o')}
                     ${flowArrow(430, 88, 'd', colors.cap)}${curLabel(448, 93, colors.cap, 'i', 'C')}
                 `;
@@ -557,7 +562,7 @@
                     ${flowArrow(130, 50, 'r', colors.ind)}${curLabel(130, 42, colors.ind, 'i', 'L1')}
                     ${flowArrow(370, 50, 'r', colors.ind)}${curLabel(370, 68, colors.ind, 'i', 'L2')}
                     ${flowArrow(210, 88, 'd', colors.sw)}${curLabel(192, 93, colors.sw, 'i', 'SW')}
-                    ${flowArrow(310, 88, 'u', colors.dio)}${curLabel(292, 93, colors.dio, 'i', 'D')}
+                    ${flowArrow(310, 88, 'd', colors.dio)}${curLabel(292, 93, colors.dio, 'i', 'D')}
                     ${flowArrow(465, 50, 'r', colors.out)}${curLabel(465, 42, colors.out, 'i', 'o')}
                     ${flowArrow(430, 88, 'd', colors.cap)}${curLabel(448, 93, colors.cap, 'i', 'C2')}
                 `;
@@ -573,8 +578,7 @@
         // always clearly visible instead of being squashed to a hairline near the panel edge.
         const buildWaveChart = (titleHtml, eqHtml, data, key, color, height=80, fill=false, opts={}) => {
             const vals = data.map(d => d[key]);
-            let dMin = Math.min(...vals), dMax = Math.min ? Math.max(...vals) : 0;
-            dMax = Math.max(...vals);
+            let dMin = Math.min(...vals), dMax = Math.max(...vals);
 
             let yMin, yMax;
             if (opts.fixedMin !== undefined) {
