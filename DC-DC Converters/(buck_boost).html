@@ -757,6 +757,7 @@
                     pt.vD = isON ? -(Vd + Math.abs(Vo)) : 0;
                     pt.io = Io;
                     pt.ic = pt.iL2 - Io;
+                    pt.ic1 = isON ? -pt.iL2 : pt.iL1;
                 }
                 
                 raw_ic.push(pt.ic);
@@ -900,11 +901,24 @@
                 `I<sub>o</sub> = V<sub>o</sub>/R = ${fmtNum(Io)} A`,
                 'io', colors.out, 48, false, {}, 'I_o', 'A'
             );
-            addChart(
-                `Capacitor Current ${sec('(' + sub('i','C') + ')')}`,
-                `i<sub>C</sub> = i<sub>L</sub> − I<sub>o</sub> (avg = 0)`,
-                'ic', colors.cap, 74, true, {}, 'i_C', 'A'
-            );
+            if (m === 'cuk') {
+    addChart(
+        `Coupling Capacitor Current ${sec('(' + sub('i','C1') + ')')}`,
+        `i<sub>C1</sub> = i<sub>L1</sub> (OFF), −i<sub>L2</sub> (ON)`,
+        'ic1', colors.cap, 74, true, {}, 'i_C1', 'A'
+    );                                                   
+    addChart(
+        `Output Capacitor Current ${sec('(' + sub('i','C2') + ')')}`,
+        `i<sub>C2</sub> = i<sub>L2</sub> − I<sub>o</sub> (avg = 0)`,
+        'ic', colors.cap, 74, true, {}, 'i_C2', 'A'
+    );                                                    
+} else {
+    addChart(
+        `Capacitor Current ${sec('(' + sub('i','C') + ')')}`,
+        `i<sub>C</sub> = i<sub>L</sub> − I<sub>o</sub> (avg = 0)`,
+        'ic', colors.cap, 74, true, {}, 'i_C', 'A'
+    );                                                    
+}                                                          
 
             let voExpr;
             if (m === 'buck') voExpr = `D·V<sub>d</sub>`;
