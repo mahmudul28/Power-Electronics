@@ -10,7 +10,7 @@ This project is a browser-based interactive learning tool for exploring common s
 
 ### 🚀 Live Simulator
 
-**[Click here to open the AC–DC Converter Interactive Simulator](https://mahmudul28.github.io/%20%20Power-Electronics/%20%20AC-DC%20Rectifier/%20%20AC-DC_Converter.html)**
+**[Click here to open the AC–DC Converter Interactive Simulator](https://mahmudul28.github.io/Power-Electronics/AC-DC%20Rectifier/AC-DC_Converter.html)**
 
 ---
 
@@ -189,7 +189,7 @@ These quantities are intended to help connect the observed waveforms with the st
 
 ## 🧪 How to Use
 
-1. Open the [live simulator](https://mahmudul28.github.io/%20%20Power-Electronics/%20%20AC-DC%20Rectifier/%20%20AC-DC_Converter.html).
+1. Open the [live simulator](https://mahmudul28.github.io/Power-Electronics/AC-DC%20Rectifier/AC-DC_Converter.html).
 2. Select the desired **converter category**.
 3. Select the **converter topology**.
 4. Choose the appropriate **load configuration**.
