@@ -8,7 +8,7 @@ This project is a fully self-contained, interactive web application designed to 
 > **For the best experience on a mobile device, please enable "Desktop Site" in your browser settings.** The interactive canvas, Gantt charts, and complex circuit diagrams require a wider screen layout for proper visualization and scaling.
 
 ### 🚀 Live Simulator Dashboard
-**[Click here to open the Interactive Simulator](https://mahmudul28.github.io/Power-Electronics/AC%20Voltage%20Controllers/)**
+**[Click here to open the Interactive Simulator](https://mahmudul28.github.io/Power-Electronics/AC-AC%20Voltage%20Controllers/index.html)**
 
 ---
 
@@ -24,7 +24,7 @@ This project is a fully self-contained, interactive web application designed to 
 ---
 
 ### 🛠️ How to Use
-1. Open the [live link](https://mahmudul28.github.io/Power-Electronics/AC%20Voltage%20Controllers/).
+1. Open the [live link](https://mahmudul28.github.io/Power-Electronics/AC-AC%20Voltage%20Controllers/).
 2. Use the top navigation tabs to select either **Standard Controllers** or **Cycloconverters**.
 3. Select your desired circuit topology from the mode menu.
 4. Use the sliders to change the firing angles or frequency ratio, and watch the mathematical engine recalculate the waveforms, neutral points, and conduction sequences instantly.
