@@ -101,91 +101,54 @@ The simulator also introduces converter-fed DC motor operation through:
 
 Depending on the selected topology, the simulator can visualize:
 
-\[
+### Input / Source Voltage
+
+$$
 v_s
-\]
+$$
 
-Input/source voltage
+### Output / Load Voltage
 
-\[
+$$
 v_o
-\]
+$$
 
-Output/load voltage
+### Load Current
 
-\[
+$$
 i_o
-\]
+$$
 
-Load current
+### Source Current
 
-\[
+$$
 i_s
-\]
+$$
 
-Source current
+### Device Voltage
 
-\[
+$$
 v_D,\;v_T
-\]
+$$
 
-Diode/thyristor voltage
+Diode and thyristor voltage.
 
-\[
+### Gate Pulses
+
+$$
 i_g
-\]
+$$
 
-Gate pulses
+The waveform horizontal axis uses the electrical angle:
 
-The waveform axis uses the electrical angle:
-
-\[
+$$
 \omega t
-\]
+$$
 
-to make conduction and firing-angle relationships easier to observe.
-
----
-
-## 🧮 Performance Parameters
-
-Where applicable, the simulator provides calculations related to:
-
-### Power Factor
-
-\[
-PF = \frac{P}{V_s I_s}
-\]
-
-### Distortion Factor
-
-\[
-DF = \frac{I_{S1}}{I_S}
-\]
-
-### Displacement Power Factor
-
-\[
-DPF = \cos\phi_1
-\]
-
-### Total Harmonic Distortion
-
-\[
-THD =
-\sqrt{\frac{1}{DF^2}-1}
-\]
-
-### Ripple Factor
-
-\[
-RF =
-\frac{\sqrt{V_{rms}^{2}-V_{dc}^{2}}}{V_{dc}}
-\]
-
-These quantities are intended to help connect the observed waveforms with the standard performance measures used in Power Electronics.
+to make conduction intervals, switching events, and firing-angle relationships easier to observe.
 
 ---
+
 
 ## 🧪 How to Use
 
