@@ -1,0 +1,1856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AC–DC Converter Visualizer – Interactive Laboratory</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+* { box-sizing: border-box; }
+body {
+  font-family:'Inter',sans-serif; color:#f1f5f9; margin:0; min-height:100vh;
+  background-color:#07070d;
+  background-image:
+    radial-gradient(ellipse 900px 500px at 8% -5%, rgba(139,92,246,0.16), transparent 60%),
+    radial-gradient(ellipse 800px 500px at 100% 0%, rgba(34,211,238,0.13), transparent 60%),
+    radial-gradient(ellipse 700px 600px at 50% 100%, rgba(16,185,129,0.08), transparent 65%),
+    linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px),
+    linear-gradient(160deg, #0a0a12 0%, #07070d 55%, #0a0710 100%);
+  background-size: auto, auto, auto, 42px 42px, 42px 42px, cover;
+  background-attachment: fixed;
+}
+.mono { font-family:'JetBrains Mono',monospace; }
+.glass { background:linear-gradient(180deg, rgba(20,22,38,0.72), rgba(12,13,24,0.72)); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border:1px solid rgba(255,255,255,0.09); box-shadow:0 8px 32px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04); position:relative; }
+.glass::before { content:''; position:absolute; inset:0; border-radius:inherit; padding:1px; background:linear-gradient(135deg, rgba(139,92,246,0.25), rgba(34,211,238,0.08) 40%, transparent 70%); -webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none; }
+.sidebar { width:260px; min-width:260px; align-self:stretch; background:linear-gradient(180deg, rgba(8,8,16,0.92), rgba(6,6,12,0.92)); backdrop-filter:blur(18px); border-right:1px solid rgba(255,255,255,0.07); box-shadow:4px 0 24px rgba(0,0,0,0.4); }
+.sidebar::-webkit-scrollbar{width:4px;} .sidebar::-webkit-scrollbar-track{background:transparent;} .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.2);border-radius:8px;}
+.nav-btn{ transition:all .2s; cursor:pointer; border-radius:10px; padding:8px 14px; font-size:13px; font-weight:500; background:rgba(255,255,255,.03); border:1px solid transparent; color:#94a3b8;}
+.nav-btn:hover{background:rgba(255,255,255,.08); color:#e2e8f0;}
+.nav-btn.active{ background:linear-gradient(135deg,rgba(99,102,241,.15),rgba(168,85,247,.15)); border-color:#8b5cf6; color:#fff; box-shadow:0 0 20px rgba(139,92,246,.15);}
+.sub-nav-btn{ transition:all .15s; cursor:pointer; border-radius:6px; padding:4px 12px; font-size:12px; font-weight:400; color:#94a3b8; border-left:2px solid transparent;}
+.sub-nav-btn:hover{color:#cbd5e1;background:rgba(255,255,255,.04);}
+.sub-nav-btn.active{color:#e2e8f0;border-left-color:#8b5cf6;background:rgba(139,92,246,.08);}
+.param-slider{-webkit-appearance:none;width:100%;height:4px;border-radius:4px;background:rgba(255,255,255,.15);outline:none;transition:background .2s;}
+.param-slider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#8b5cf6;cursor:pointer;box-shadow:0 0 12px rgba(139,92,246,.4);border:2px solid rgba(255,255,255,.3);}
+.param-slider:disabled{opacity:.3;}
+.param-label{font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.03em;}
+.param-value{font-size:13px;font-weight:600;color:#f1f5f9;font-family:'JetBrains Mono',monospace;}
+.waveform-container{position:relative;overflow:hidden;}
+.waveform-container svg{display:block;width:100%;height:auto;}
+.cursor-line{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.5);pointer-events:none;box-shadow:0 0 6px rgba(255,255,255,.3);z-index:20;display:none;}
+.cursor-readout{position:absolute;background:rgba(0,0,0,.9);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.6;pointer-events:none;z-index:30;display:none;backdrop-filter:blur(8px);min-width:170px;color:#e2e8f0;}
+.metric-card{background:rgba(0,0,0,.25);border-radius:10px;padding:10px 12px;border:1px solid rgba(255,255,255,.05);}
+.metric-value{font-size:17px;font-weight:700;font-family:'JetBrains Mono',monospace;line-height:1.2;}
+.metric-label{font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;}
+.device-on{filter:drop-shadow(0 0 8px currentColor);opacity:1;}
+.device-off{opacity:.22;}
+.fade-in{animation:fadeIn .25s ease;} @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+.badge-ccm{background:#10b98120;border-color:#10b981;color:#10b981;} .badge-dcm{background:#f59e0b20;border-color:#f59e0b;color:#f59e0b;} .badge-inverter{background:#ef444420;border-color:#ef4444;color:#ef4444;}
+.badge{border:1px solid; border-radius:999px; padding:2px 10px; font-size:11px; font-weight:700;}
+.icon-btn{cursor:pointer;border-radius:8px;padding:6px 10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);color:#cbd5e1;font-size:12px;transition:.15s;}
+.icon-btn:hover{background:rgba(139,92,246,.15);border-color:#8b5cf6;color:#fff;}
+.icon-btn.active{background:rgba(139,92,246,.25);border-color:#8b5cf6;color:#fff;}
+.toggle{position:relative;width:38px;height:20px;border-radius:999px;background:rgba(255,255,255,.15);cursor:pointer;transition:.2s;flex-shrink:0;}
+.toggle.on{background:#8b5cf6;}
+.toggle .dot{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s;}
+.toggle.on .dot{left:20px;}
+.edu-box{background:rgba(0,0,0,.22);border-radius:10px;padding:10px 12px;border-left:3px solid #8b5cf6;}
+.timeline-row{display:grid;grid-template-columns:60px 1fr;gap:8px;align-items:center;}
+.timeline-bar{height:18px;border-radius:5px;background:rgba(255,255,255,.05);position:relative;overflow:hidden;}
+.timeline-seg{position:absolute;top:2px;bottom:2px;border-radius:4px;}
+.chart-panel{background:rgba(0,0,0,.22);border-radius:10px;border:1px solid rgba(255,255,255,.05);padding:8px 4px 2px;}
+.chart-panel-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;padding:0 10px 2px;}
+/* Whole-page zoom: everything (sidebar, options, circuit, pulses, waveforms) lives
+   inside #zoom-stage. #zoom-viewport is the real scrolling box (unaffected by the
+   scale), #zoom-sizer is resized in JS to the stage's scaled footprint so native
+   scrollbars appear at the correct extents instead of clipping content. */
+#zoom-viewport{height:100vh;width:100%;overflow:auto;display:flex;justify-content:center;justify-content:safe center;align-items:flex-start;}
+#zoom-sizer{position:relative;flex-shrink:0;}
+#zoom-stage{transform-origin:top left;position:absolute;top:0;left:0;width:100vw;}
+.zoom-fab{position:fixed;right:18px;bottom:18px;z-index:200;display:flex;align-items:center;gap:2px;background:rgba(8,8,16,.9);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:6px;box-shadow:0 8px 28px rgba(0,0,0,.55);}
+.zoom-fab .icon-btn{padding:6px 11px;font-size:14px;font-weight:700;line-height:1;}
+.zoom-fab .zf-label{font-family:'JetBrains Mono',monospace;font-size:11px;color:#e2e8f0;width:44px;text-align:center;cursor:pointer;user-select:none;}
+</style>
+</head>
+<body>
+<div id="mobile-warning" class="hidden fixed inset-0 z-[999] bg-black/92 backdrop-blur-sm flex items-center justify-center p-6">
+  <div class="glass rounded-2xl p-6 max-w-sm text-center space-y-3">
+    <div class="text-3xl">🖥️</div>
+    <div class="text-lg font-bold text-slate-100">Desktop Experience Recommended</div>
+    <p class="text-sm text-slate-400 leading-relaxed">This laboratory has dense circuit diagrams, multi-trace waveforms and sliders that need a larger screen. Please turn on <b>"Desktop site"</b> in your mobile browser's menu for the full experience.</p>
+    <button id="mobile-warning-dismiss" class="icon-btn active">Continue anyway</button>
+  </div>
+</div>
+<div id="zoom-viewport">
+<div id="zoom-sizer">
+<div id="zoom-stage">
+<div class="flex" id="app-shell">
+  <aside class="sidebar flex flex-col p-4 space-y-4">
+    <div class="flex items-center gap-2 pb-2 border-b border-white/5">
+      <span class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">AC–DC Lab</span>
+      <span class="text-[10px] text-slate-500 mono ml-auto">v2.0</span>
+    </div>
+    <div><div class="param-label mb-1.5">Category</div><div class="space-y-1" id="category-container"></div></div>
+    <div><div class="param-label mb-1.5">Converter Type</div><div class="space-y-1" id="type-container"></div></div>
+    <div><div class="param-label mb-1.5">Load / Mode</div><div class="space-y-1" id="load-container"></div></div>
+    <div id="fwd-toggle-wrap" class="hidden">
+      <div class="flex items-center justify-between glass rounded-lg px-3 py-2">
+        <span class="text-xs text-slate-300">Freewheeling Diode</span>
+        <div class="toggle" id="fwd-toggle"><div class="dot"></div></div>
+      </div>
+    </div>
+    <div class="mt-auto pt-4 border-t border-white/5 text-[10px] text-slate-500 space-y-1">
+      <div class="flex justify-between"><span>Status</span><span id="status-badge" class="text-emerald-400">Ready</span></div>
+      <div class="flex justify-between items-center"><span>Mode</span>
+        <span id="mode-badge" class="badge badge-ccm cursor-pointer" title="Click to cycle: Auto → force CCM view → force DCM view">CCM</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="flex-1 overflow-y-auto p-4 space-y-4">
+    <div class="glass rounded-2xl p-5 flex flex-wrap items-center gap-4">
+      <div class="flex-1 min-w-[220px]">
+        <h2 class="text-2xl font-bold" id="page-title">Half-Wave Uncontrolled Rectifier</h2>
+        <p class="text-slate-400 text-sm" id="page-subtitle">R Load</p>
+      </div>
+      <div class="flex flex-wrap gap-4 items-center" id="param-panel"></div>
+    </div>
+
+    <div class="glass rounded-2xl p-4">
+      <div class="flex items-center justify-between mb-2">
+        <div class="param-label">Circuit Schematic <span id="circuit-state-label" class="normal-case text-slate-500 ml-2"></span></div>
+        <div class="flex gap-2 items-center text-[10px] text-slate-500 mono" id="alpha-beta-readout"></div>
+      </div>
+      <div id="circuit-container" class="flex justify-center bg-black/30 rounded-xl border border-white/5 p-4 overflow-x-auto"></div>
+    </div>
+
+    <div id="source-panel-wrap" class="hidden space-y-4"></div>
+
+    <div class="glass rounded-2xl p-4">
+      <div class="flex flex-wrap gap-3 mb-1 items-center">
+        <span class="param-label mr-1">Signals:</span>
+        <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="signal-toggle" data-signal="vs" checked> v<sub>s</sub></label>
+        <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="signal-toggle" data-signal="vo" checked> v<sub>o</sub></label>
+        <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="signal-toggle" data-signal="io" checked> i<sub>o</sub></label>
+        <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="signal-toggle" data-signal="is"> i<sub>s</sub></label>
+        <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="signal-toggle" data-signal="vT"> v<sub>T</sub></label>
+        <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="signal-toggle" data-signal="ig"> gate</label>
+        <div class="ml-auto flex items-center gap-2">
+          <button class="icon-btn" id="btn-export-png" title="Download every waveform panel (incl. source & gate) as one PNG">⬇ PNG</button>
+          <button class="icon-btn" id="btn-reset">⟲ Reset</button>
+          <button class="icon-btn" id="btn-play">▶ Play</button>
+          <select id="speed-select" class="icon-btn mono">
+            <option value="0.25">0.25×</option><option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option><option value="2">2×</option><option value="5">5×</option>
+          </select>
+        </div>
+      </div>
+      <div id="waveform-container" class="relative waveform-container">
+        <div id="waveform-svg-wrapper" class="space-y-3"></div>
+        <div class="cursor-line" id="cursor-line"></div>
+        <div class="cursor-readout" id="cursor-readout"></div>
+      </div>
+    </div>
+
+    <div class="glass rounded-2xl p-4">
+      <div class="param-label mb-2">Conduction Timeline</div>
+      <div id="timeline-container" class="space-y-1.5"></div>
+    </div>
+
+    <div class="glass rounded-2xl p-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="param-label">Metrics & Performance</div>
+        <div class="text-[10px] text-slate-500 mono" id="error-readout"></div>
+      </div>
+      <div id="metrics-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3"></div>
+    </div>
+
+    <div class="glass rounded-2xl p-4" id="harmonics-panel">
+      <div class="param-label mb-2">Harmonic Spectrum — Source Current i<sub>s</sub></div>
+      <div id="harmonics-container"></div>
+    </div>
+
+    <div class="glass rounded-2xl p-4">
+      <div class="param-label mb-2">Educational Insight</div>
+      <div id="educational-panel" class="text-sm text-slate-300 space-y-2 leading-relaxed"></div>
+    </div>
+
+    <div class="text-center text-[10px] text-slate-600 mono py-2 space-y-1">
+      <div>AC–DC Converter Interactive Laboratory</div>
+      <div class="text-slate-700">Mahmudul Hasan(2202156)</div>
+    </div>
+  </main>
+</div>
+</div>
+</div>
+</div>
+
+<div class="zoom-fab">
+  <button class="icon-btn" id="btn-zoom-out" title="Zoom out whole page">−</button>
+  <span class="zf-label" id="zoom-label" title="Click to reset to 100%">100%</span>
+  <button class="icon-btn" id="btn-zoom-in" title="Zoom in whole page">+</button>
+</div>
+
+<script>
+// ============================================================
+// AC-DC LAB — UNIFIED SIMULATION ENGINE
+// Validated against textbook analytic formulas (see test4.js).
+// ============================================================
+
+function derivative(i, applied, R, L, E, omega) { return (applied - R * i - E) / (L * omega); }
+function rk4Step(i, applied, R, L, E, omega, dtheta) {
+  const k1 = derivative(i, applied, R, L, E, omega);
+  const k2 = derivative(i + 0.5 * dtheta * k1, applied, R, L, E, omega);
+  const k3 = derivative(i + 0.5 * dtheta * k2, applied, R, L, E, omega);
+  const k4 = derivative(i + dtheta * k3, applied, R, L, E, omega);
+  return i + (dtheta / 6) * (k1 + 2 * k2 + 2 * k3 + k4);
+}
+
+// Selects which pole/device conducts using an alpha-delayed reference (models
+// the gate/firing delay), but returns the REAL instantaneous (undelayed)
+// voltage of that pole so negative excursions appear correctly for alpha>90 deg.
+function selectPole(theta, alphaRad, fns, mode) {
+  let bestIdx = 0, bestRef = mode === 'max' ? -Infinity : Infinity;
+  const ref = theta - alphaRad;
+  for (let k = 0; k < fns.length; k++) {
+    const v = fns[k](ref);
+    if (mode === 'max' ? v > bestRef : v < bestRef) { bestRef = v; bestIdx = k; }
+  }
+  return { value: fns[bestIdx](theta), index: bestIdx };
+}
+
+// selectFn(theta) -> { value, index, topIndex?, bottomIndex? }
+function integrateEngine(thetas, selectFn, hasFWD, R, L, E, omega, subSteps) {
+  const n = thetas.length;
+  const iArr = new Float64Array(n);
+  const voArr = new Float64Array(n);
+  const branchArr = new Array(n);
+  const selArr = new Array(n);
+  // For (near-)zero inductance the RL time-constant collapses to ~0 in ωt-space,
+  // which makes the explicit RK4 ODE numerically stiff (dtheta >> tau) and can
+  // make current spuriously clamp to 0 for the whole run. Physically, negligible
+  // L means current tracks the applied voltage algebraically anyway, so just
+  // compute it directly instead of integrating a stiff ODE.
+  const algebraic = (L * omega) / Math.max(R, 1e-6) < 5e-3;
+  let i = 0;
+  for (let idx = 0; idx < n; idx++) {
+    const theta = thetas[idx];
+    const sel = selectFn(theta);
+    const Vsel = sel.value;
+    let branch, applied;
+
+    if (algebraic) {
+      if (Vsel > E + 1e-9) { branch = 'MAIN'; applied = Vsel; i = Math.max(0, (applied - E) / R); }
+      else { branch = 'OFF'; applied = E; i = 0; }
+      iArr[idx] = i; voArr[idx] = applied; branchArr[idx] = branch; selArr[idx] = sel;
+      continue;
+    }
+
+    const mainWould = (i > 1e-9) || (Vsel > E + 1e-9);
+    if (hasFWD && Vsel <= E + 1e-9 && i > 1e-9) { branch = 'FWD'; applied = 0; }
+    else if (mainWould && (!hasFWD || Vsel > E + 1e-9)) { branch = 'MAIN'; applied = Vsel; }
+    else if (hasFWD && i > 1e-9) { branch = 'FWD'; applied = 0; }
+    else { branch = 'OFF'; applied = E; i = 0; }
+
+    if (idx < n - 1) {
+      const dtheta = (thetas[idx + 1] - theta) / subSteps;
+      let iNext = i;
+      for (let s = 0; s < subSteps; s++) {
+        iNext = rk4Step(iNext, applied, R, L, E, omega, dtheta);
+        if (branch === 'OFF') { iNext = 0; }
+        else if (iNext < 0) { iNext = 0; break; }
+      }
+      i = iNext;
+    }
+    iArr[idx] = i;
+    voArr[idx] = applied;
+    branchArr[idx] = branch;
+    selArr[idx] = sel;
+  }
+  return { i: iArr, vo: voArr, branch: branchArr, sel: selArr };
+}
+
+if (typeof module !== 'undefined') module.exports = { integrateEngine, selectPole, rk4Step };
+
+
+// ============================================================
+// TOPOLOGY BUILDERS
+// ============================================================
+function buildTopology(type, load, params) {
+  const { Vrms, alpha } = params;
+  const Vm = Vrms * Math.SQRT2;
+  const alphaRad = alpha * Math.PI / 180;
+  const vs = th => Vm * Math.sin(th);
+  const vneg = th => -Vm * Math.sin(th);
+  const va = th => Vm * Math.sin(th);
+  const vb = th => Vm * Math.sin(th - 2 * Math.PI / 3);
+  const vc = th => Vm * Math.sin(th - 4 * Math.PI / 3);
+  const hasFWDLoad = load.indexOf('FWD') !== -1;
+  const isControlled = type.indexOf('controlled') !== -1 && type.indexOf('uncontrolled') === -1;
+
+  if (type === 'half-wave-uncontrolled' || type === 'half-wave-controlled') {
+    const a = isControlled ? alphaRad : 0;
+    const selectFn = th => {
+      const inWindow = (((th % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) >= a;
+      return { value: inWindow ? vs(th) : -1e9, index: 0 };
+    };
+    return { selectFn, hasFWD: hasFWDLoad, nPoles: 1, isControlled,
+      poleLabels: [isControlled ? 'T1' : 'D1'], fwdLabel: 'FWD', threePhase: false,
+      vsDisplay: vs, alphaUsed: a, firingPeriod: 2 * Math.PI };
+  }
+  if (type === 'full-wave-uncontrolled-bridge' || type === 'full-wave-controlled-bridge') {
+    const a = isControlled ? alphaRad : 0;
+    const selectFn = th => selectPole(th, a, [vs, vneg], 'max');
+    return { selectFn, hasFWD: false, nPoles: 2, isControlled,
+      poleLabels: isControlled ? ['T1,T2','T3,T4'] : ['D1,D2','D3,D4'], threePhase: false,
+      vsDisplay: vs, alphaUsed: a, firingPeriod: Math.PI };
+  }
+  if (type === 'semi-converter') {
+    const a = alphaRad;
+    const selectFn = th => selectPole(th, a, [vs, vneg], 'max');
+    return { selectFn, hasFWD: true, nPoles: 2, isControlled: true,
+      poleLabels: ['T1,D2','T2,D1'], fwdLabel: 'FWD', threePhase: false,
+      vsDisplay: vs, alphaUsed: a, firingPeriod: Math.PI };
+  }
+  if (type === 'three-phase-half-wave-uncontrolled' || type === 'three-phase-half-wave-controlled') {
+    const a = isControlled ? alphaRad : 0;
+    const selectFn = th => selectPole(th, a, [va, vb, vc], 'max');
+    return { selectFn, hasFWD: false, nPoles: 3, isControlled,
+      poleLabels: isControlled ? ['T1(a)','T2(b)','T3(c)'] : ['D1(a)','D2(b)','D3(c)'],
+      threePhase: true, phases: { va, vb, vc }, vsDisplay: va, alphaUsed: a, firingPeriod: 2 * Math.PI / 3 };
+  }
+  if (type === 'three-phase-full-wave-uncontrolled-bridge' || type === 'three-phase-full-wave-controlled-bridge') {
+    const a = isControlled ? alphaRad : 0;
+    const selectFn = th => {
+      const top = selectPole(th, a, [va, vb, vc], 'max');
+      const bot = selectPole(th, a, [va, vb, vc], 'min');
+      return { value: top.value - bot.value, index: top.index, topIndex: top.index, bottomIndex: bot.index };
+    };
+    const topLbl = { 0: 'T1', 1: 'T3', 2: 'T5' }, botLbl = { 0: 'T6', 1: 'T2', 2: 'T4' };
+    return { selectFn, hasFWD: false, nPoles: 6, isControlled, isBridge6: true, topLbl, botLbl,
+      threePhase: true, phases: { va, vb, vc }, vsDisplay: va, alphaUsed: a, firingPeriod: Math.PI / 3 };
+  }
+  return null;
+}
+
+function linspace(a, b, n) { const arr = new Float64Array(n); for (let k = 0; k < n; k++) arr[k] = a + (b - a) * k / (n - 1); return arr; }
+
+// ============================================================
+// FULL SIMULATION: returns theta,vs,vo,io,is,vT,ig,branch,devState + metrics
+// ============================================================
+function simulateConverter(type, load, params) {
+  const { Vrms, f, R, L, E } = params;
+  const omega = 2 * Math.PI * f;
+  const topo = buildTopology(type, load, params);
+  if (!topo) return null;
+
+  const cyclesTotal = 8, ptsPerCycle = 720, sub = 8;
+  const Nfull = cyclesTotal * ptsPerCycle;
+  const thetaFull = linspace(0, 2 * Math.PI * cyclesTotal, Nfull);
+  const Leff = Math.max(L, 1e-5);
+  const eng = integrateEngine(thetaFull, topo.selectFn, topo.hasFWD, R, Leff, E, omega, sub);
+
+  const startIdx = Nfull - 2 * ptsPerCycle;
+  const N = 2 * ptsPerCycle + 1;
+  const theta = new Float64Array(N), vo = new Float64Array(N), io = new Float64Array(N);
+  const is = new Float64Array(N), vT = new Float64Array(N), ig = new Float64Array(N), vsArr = new Float64Array(N);
+  const branch = new Array(N), sel = new Array(N), devLabel = new Array(N);
+  const thetaOffset = thetaFull[startIdx];
+
+  for (let k = 0; k < N; k++) {
+    const src = Math.min(startIdx + k, Nfull - 1);
+    const th = thetaFull[src] - thetaOffset;
+    theta[k] = th;
+    vo[k] = eng.vo[src];
+    io[k] = eng.i[src];
+    branch[k] = eng.branch[src];
+    sel[k] = eng.sel[src];
+    vsArr[k] = topo.vsDisplay(th);
+
+    // source current + device label + vT
+    if (topo.isBridge6) {
+      const s = sel[k];
+      if (branch[k] === 'MAIN') {
+        // whichever phase is top or bottom carries current in that direction
+        is[k] = 0; // filled per-phase below via helper; here store net (phase a) for default plot
+      }
+      devLabel[k] = branch[k] === 'MAIN' ? (topo.topLbl[s.topIndex] + '+' + topo.botLbl[s.bottomIndex]) : 'blocking';
+      vT[k] = branch[k] === 'MAIN' ? 0 : (topo.phases.va(th) - vo[k]);
+      is[k] = branch[k] === 'MAIN' && sel[k].topIndex === 0 ? io[k] : (branch[k] === 'MAIN' && sel[k].bottomIndex === 0 ? -io[k] : 0);
+    } else if (topo.threePhase) {
+      devLabel[k] = branch[k] === 'MAIN' ? topo.poleLabels[sel[k].index] : 'blocking';
+      vT[k] = branch[k] === 'MAIN' ? 0 : (topo.phases.va(th) - vo[k]);
+      is[k] = branch[k] === 'MAIN' && sel[k].index === 0 ? io[k] : 0;
+    } else if (topo.nPoles === 2) {
+      devLabel[k] = branch[k] === 'MAIN' ? topo.poleLabels[sel[k].index] : (branch[k] === 'FWD' ? topo.fwdLabel : 'blocking');
+      vT[k] = branch[k] === 'MAIN' ? 0 : (topo.vsDisplay(th) - vo[k]);
+      is[k] = branch[k] === 'MAIN' ? (sel[k].index === 0 ? io[k] : -io[k]) : 0;
+    } else {
+      devLabel[k] = branch[k] === 'MAIN' ? topo.poleLabels[0] : (branch[k] === 'FWD' ? topo.fwdLabel : 'blocking');
+      vT[k] = branch[k] === 'MAIN' ? 0 : (topo.vsDisplay(th) - vo[k]);
+      is[k] = branch[k] === 'MAIN' ? io[k] : 0;
+    }
+    // gate pulse: rising edge into MAIN, OR a hand-off from one conducting
+    // device/pole to the next while staying continuously in MAIN (CCM) —
+    // both are real firing events and must show a gate pulse.
+    function poleKey(kk) {
+      if (branch[kk] !== 'MAIN') return null;
+      const sl = sel[kk];
+      return topo.isBridge6 ? (sl.topIndex + '-' + sl.bottomIndex) : String(sl.index);
+    }
+    const curKey = poleKey(k), prevKey = k > 0 ? poleKey(k - 1) : null;
+    ig[k] = (branch[k] === 'MAIN' && (k === 0 || branch[k - 1] !== 'MAIN' || curKey !== prevKey)) ? 1 : 0;
+  }
+
+  const metrics = computeMetrics(theta, vsArr, vo, io, is, omega);
+  const mode = detectMode(branch);
+  return { theta, vs: vsArr, vo, io, is, vT, ig, branch, sel, devLabel, topo, omega, Vm: Vrms * Math.SQRT2, metrics, mode, params };
+}
+
+function detectMode(branch) {
+  for (let k = 0; k < branch.length; k++) if (branch[k] === 'OFF') return 'DCM';
+  return 'CCM';
+}
+
+// trapezoidal integral over one fundamental cycle (theta[0..N1] spanning 2π)
+function trapz(theta, y, thetaMax) {
+  let sum = 0;
+  for (let k = 0; k < theta.length - 1; k++) {
+    if (theta[k] > thetaMax) break;
+    sum += 0.5 * (y[k] + y[k + 1]) * (theta[k + 1] - theta[k]);
+  }
+  return sum;
+}
+
+function computeMetrics(theta, vs, vo, io, is, omega) {
+  const twoPi = 2 * Math.PI;
+  const Vdc = trapz(theta, vo, twoPi) / twoPi;
+  const Idc = trapz(theta, io, twoPi) / twoPi;
+  const vo2 = vo.map(v => v * v), io2 = io.map(v => v * v), is2 = is.map(v => v * v);
+  const Vrms = Math.sqrt(Math.max(0, trapz(theta, vo2, twoPi) / twoPi));
+  const Irms = Math.sqrt(Math.max(0, trapz(theta, io2, twoPi) / twoPi));
+  const IsRms = Math.sqrt(Math.max(0, trapz(theta, is2, twoPi) / twoPi));
+  const VsRms = Math.sqrt(Math.max(0, trapz(theta, vs.map(v => v * v), twoPi) / twoPi));
+
+  // fundamental DFT of is (n=1) relative to theta (source voltage reference is sin(theta))
+  let a1 = 0, b1 = 0, Pavg = 0;
+  for (let k = 0; k < theta.length - 1; k++) {
+    if (theta[k] > twoPi) break;
+    const dth = theta[k + 1] - theta[k];
+    a1 += is[k] * Math.cos(theta[k]) * dth;
+    b1 += is[k] * Math.sin(theta[k]) * dth;
+    Pavg += vs[k] * is[k] * dth;
+  }
+  a1 = a1 * 2 / twoPi; b1 = b1 * 2 / twoPi; Pavg = Pavg / twoPi;
+  const Is1Peak = Math.sqrt(a1 * a1 + b1 * b1);
+  const Is1Rms = Is1Peak / Math.SQRT2;
+  const phi1 = Math.atan2(-a1, b1); // displacement angle vs vs=sin(theta) reference
+  const DPF = Math.cos(phi1);
+  const DF = IsRms > 1e-6 ? Is1Rms / IsRms : 1;
+  const THD = DF > 1e-6 ? Math.sqrt(Math.max(0, 1 / (DF * DF) - 1)) : 0;
+  const PF = (VsRms * IsRms > 1e-6) ? Pavg / (VsRms * IsRms) : 0;
+  const RF = Vdc > 1e-6 ? Math.sqrt(Math.max(0, Vrms * Vrms - Vdc * Vdc)) / Vdc : 0;
+
+  // harmonic spectrum (n=1,3,5,7,9,11,13)
+  const harmonics = [];
+  for (const n of [1, 3, 5, 7, 9, 11, 13]) {
+    let an = 0, bn = 0;
+    for (let k = 0; k < theta.length - 1; k++) {
+      if (theta[k] > twoPi) break;
+      const dth = theta[k + 1] - theta[k];
+      an += is[k] * Math.cos(n * theta[k]) * dth;
+      bn += is[k] * Math.sin(n * theta[k]) * dth;
+    }
+    an = an * 2 / twoPi; bn = bn * 2 / twoPi;
+    harmonics.push({ n, rms: Math.sqrt(an * an + bn * bn) / Math.SQRT2 });
+  }
+
+  return { Vdc, Idc, Vrms, Irms, IsRms, VsRms, DPF, DF, THD, PF, RF, Pavg, harmonics, Is1Rms };
+}
+
+// ============================================================
+// STATE & CONFIG
+// ============================================================
+const state = {
+  category: 'single-phase',
+  type: 'half-wave-uncontrolled',
+  load: 'R',
+  hasFWD: false,
+  dirPositive: true,
+  params: { Vrms: 230, f: 50, R: 10, L: 0.05, E: 0, alpha: 30 },
+  cursorTheta: null,
+  playing: false,
+  speed: 1,
+  playTheta: 0,
+  lastFrameTs: null,
+  modeOverride: 'auto', // 'auto' | 'CCM' | 'DCM' — user can force either label to compare
+  zoom: 1,
+};
+let animationId = null;
+const CATEGORIES = [
+  { id: 'single-phase', label: 'Single-Phase' },
+  { id: 'three-phase', label: 'Three-Phase' },
+  { id: 'dual-converter', label: 'Dual Converter' },
+  { id: 'motor-drive', label: 'DC Motor Drive' },
+];
+
+const TYPE_MAP = {
+  'single-phase': [
+    { id: 'half-wave-uncontrolled', label: 'Half-Wave Uncontrolled' },
+    { id: 'half-wave-controlled', label: 'Half-Wave Controlled' },
+    { id: 'full-wave-uncontrolled-bridge', label: 'Full-Wave Uncontrolled Bridge' },
+    { id: 'full-wave-controlled-bridge', label: 'Full-Wave Controlled Bridge' },
+    { id: 'semi-converter', label: 'Semi-Converter' },
+  ],
+  'three-phase': [
+    { id: 'three-phase-half-wave-uncontrolled', label: '3-Diode Half-Wave' },
+    { id: 'three-phase-full-wave-uncontrolled-bridge', label: '6-Diode Full-Wave Bridge' },
+    { id: 'three-phase-half-wave-controlled', label: '3-SCR Half-Wave' },
+    { id: 'three-phase-full-wave-controlled-bridge', label: '6-SCR Full Bridge' },
+  ],
+  'dual-converter': [{ id: 'dual-converter', label: 'Dual Converter (4-Quadrant)' }],
+  'motor-drive': [{ id: 'motor-drive', label: 'DC Motor Drive' }],
+};
+
+const LOAD_MAP = {
+  'half-wave-uncontrolled': ['R', 'L', 'RL', 'RLE'],
+  'half-wave-controlled': ['R', 'RL', 'RLE'],
+  'full-wave-uncontrolled-bridge': ['RL', 'RLE'],
+  'full-wave-controlled-bridge': ['RL', 'RLE'],
+  'semi-converter': ['RL', 'RLE'],
+  'three-phase-half-wave-uncontrolled': ['R', 'RL'],
+  'three-phase-full-wave-uncontrolled-bridge': ['R', 'RL'],
+  'three-phase-half-wave-controlled': ['R', 'RL'],
+  'three-phase-full-wave-controlled-bridge': ['R', 'RL'],
+  'dual-converter': ['complementary'],
+  'motor-drive': ['motoring', 'regenerative', 'dynamic-braking', 'plugging'],
+};
+
+const FWD_ELIGIBLE = { 'half-wave-uncontrolled': true, 'half-wave-controlled': true };
+
+// alpha presets shown as quick-pick chips for 3-phase (per spec §14)
+const ALPHA_PRESETS = {
+  'three-phase-half-wave-controlled': { R: [0, 15, 30, 60], RL: [30, 60, 90] },
+};
+
+const $ = id => document.getElementById(id);
+
+// DOM refs
+let catContainer, typeContainer, loadContainer, fwdWrap, fwdToggle;
+let circuitContainer, waveformWrapper, metricsGrid, eduPanel, timelineContainer;
+let cursorLine, cursorReadout, statusBadge, modeBadge, pageTitle, pageSubtitle, paramPanel;
+let harmonicsContainer, errorReadout, alphaBetaReadout, circuitStateLabel;
+
+function bindDom() {
+  catContainer = $('category-container'); typeContainer = $('type-container'); loadContainer = $('load-container');
+  fwdWrap = $('fwd-toggle-wrap'); fwdToggle = $('fwd-toggle');
+  circuitContainer = $('circuit-container'); waveformWrapper = $('waveform-svg-wrapper');
+  metricsGrid = $('metrics-grid'); eduPanel = $('educational-panel'); timelineContainer = $('timeline-container');
+  cursorLine = $('cursor-line'); cursorReadout = $('cursor-readout');
+  statusBadge = $('status-badge'); modeBadge = $('mode-badge');
+  pageTitle = $('page-title'); pageSubtitle = $('page-subtitle'); paramPanel = $('param-panel');
+  harmonicsContainer = $('harmonics-container'); errorReadout = $('error-readout');
+  alphaBetaReadout = $('alpha-beta-readout'); circuitStateLabel = $('circuit-state-label');
+}
+
+const TYPE_LABELS = {};
+TYPE_MAP['single-phase'].concat(TYPE_MAP['three-phase'], TYPE_MAP['dual-converter'], TYPE_MAP['motor-drive'])
+  .forEach(t => TYPE_LABELS[t.id] = t.label);
+
+// ============================================================
+// MAIN RENDER DISPATCH
+// ============================================================
+let currentResult = null;
+
+function render() {
+  renderNav();
+  if (state.category === 'dual-converter') { renderDualConverter(); return; }
+  if (state.category === 'motor-drive') { renderMotorDrive(); return; }
+  renderStandardConverter();
+}
+
+function effectiveLoad() {
+  // 'L' pseudo-load -> tiny R internally to approximate pure inductor
+  return state.load;
+}
+
+function renderStandardConverter() {
+  pageTitle.textContent = TYPE_LABELS[state.type] || state.type;
+  pageSubtitle.textContent = state.load + (FWD_ELIGIBLE[state.type] && state.hasFWD ? ' + FWD' : '');
+  renderParamPanel();
+
+  const p = Object.assign({}, state.params);
+  if (state.load === 'L') p.R = Math.min(p.R, 0.05); // near-pure-inductor approximation
+  if (state.load === 'R') { p.L = 1e-5; p.E = 0; }
+  if (state.load === 'RL') p.E = 0;
+  const loadForEngine = (FWD_ELIGIBLE[state.type] && state.hasFWD && (state.load === 'RL' || state.load === 'RLE')) ? state.load + '-FWD' : state.load;
+
+  const result = simulateConverter(state.type, loadForEngine, p);
+  currentResult = result;
+
+  fwdWrap.classList.toggle('hidden', !(FWD_ELIGIBLE[state.type] && (state.load === 'RL' || state.load === 'RLE')));
+  fwdToggle.classList.toggle('on', state.hasFWD);
+
+  renderCircuit(result, null);
+  renderThreePhaseSource(result);
+  renderWaveforms(result);
+  renderTimeline(result);
+  renderMetrics(result);
+  renderHarmonics(result);
+  renderEducation(result, null);
+  updateStatus(result);
+  harmonicsContainer.parentElement.classList.remove('hidden');
+}
+
+// ============================================================
+// NAV
+// ============================================================
+function renderNav() {
+  catContainer.innerHTML = CATEGORIES.map(c =>
+    `<div class="nav-btn ${state.category === c.id ? 'active' : ''}" data-category="${c.id}">${c.label}</div>`).join('');
+  catContainer.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.onclick = () => {
+      state.category = btn.dataset.category;
+      const types = TYPE_MAP[state.category] || [];
+      state.type = types.length ? types[0].id : '';
+      const loads = LOAD_MAP[state.type] || [];
+      state.load = loads.length ? loads[0] : '';
+      state.hasFWD = false;
+      stopAnimation();
+      render();
+    };
+  });
+
+  const types = TYPE_MAP[state.category] || [];
+  typeContainer.innerHTML = types.map(t =>
+    `<div class="sub-nav-btn ${state.type === t.id ? 'active' : ''}" data-type="${t.id}">${t.label}</div>`).join('');
+  typeContainer.querySelectorAll('.sub-nav-btn').forEach(btn => {
+    btn.onclick = () => {
+      state.type = btn.dataset.type;
+      const loads = LOAD_MAP[state.type] || [];
+      state.load = loads.length ? loads[0] : '';
+      state.hasFWD = false;
+      stopAnimation();
+      render();
+    };
+  });
+
+  const loads = LOAD_MAP[state.type] || [];
+  loadContainer.innerHTML = loads.map(l =>
+    `<div class="sub-nav-btn ${state.load === l ? 'active' : ''}" data-load="${l}">${l}</div>`).join('');
+  loadContainer.querySelectorAll('.sub-nav-btn').forEach(btn => {
+    btn.onclick = () => { state.load = btn.dataset.load; stopAnimation(); render(); };
+  });
+}
+
+// ============================================================
+// PARAM PANEL (dynamic sliders)
+// ============================================================
+function paramRow(key, label, min, max, step, fmt) {
+  const v = state.params[key];
+  return `<div class="flex items-center gap-2" data-param-row="${key}">
+    <span class="param-label">${label}</span>
+    <input type="range" class="param-slider w-20" id="slider-${key}" min="${min}" max="${max}" step="${step}" value="${v}">
+    <span class="param-value" id="val-${key}">${fmt(v)}</span>
+  </div>`;
+}
+
+function renderParamPanel() {
+  const isControlled = state.type.indexOf('controlled') !== -1 && state.type.indexOf('uncontrolled') === -1;
+  const hasE = state.load.indexOf('E') !== -1;
+  const hasL = state.load !== 'R';
+  let html = '';
+  html += paramRow('Vrms', 'V<sub>rms</sub>', 50, 400, 5, v => v + ' V');
+  html += paramRow('f', 'f', 25, 100, 5, v => v + ' Hz');
+  html += paramRow('R', 'R', 1, 50, 0.5, v => v + ' Ω');
+  if (hasL) html += paramRow('L', 'L', 0.001, 1, 0.001, v => (v * 1000).toFixed(0) + ' mH');
+  if (hasE) html += paramRow('E', 'E', 0, 300, 5, v => v + ' V');
+  if (isControlled) html += paramRow('alpha', 'α', 0, 179, 1, v => v + '°');
+  paramPanel.innerHTML = html;
+
+  Object.keys(state.params).forEach(key => {
+    const el = $('slider-' + key);
+    if (!el) return;
+    el.addEventListener('input', () => {
+      let val = parseFloat(el.value);
+      state.params[key] = val;
+      $('val-' + key).textContent = { Vrms: v => v + ' V', f: v => v + ' Hz', R: v => v + ' Ω', L: v => (v * 1000).toFixed(0) + ' mH', E: v => v + ' V', alpha: v => v + '°' }[key](val);
+      stopAnimation();
+      renderStandardConverter();
+    });
+  });
+
+  // alpha presets
+  const presets = ALPHA_PRESETS[state.type] && ALPHA_PRESETS[state.type][state.load];
+  if (presets && isControlled) {
+    paramPanel.innerHTML += `<div class="flex items-center gap-1" id="alpha-presets">${presets.map(a => `<button class="icon-btn mono" data-alpha="${a}">${a}°</button>`).join('')}</div>`;
+    paramPanel.querySelectorAll('#alpha-presets button').forEach(b => {
+      b.onclick = () => { state.params.alpha = parseFloat(b.dataset.alpha); stopAnimation(); render(); };
+    });
+  }
+}
+
+function displayedMode(result) {
+  // state.modeOverride: 'auto' | 'CCM' | 'DCM' — lets the user keep both
+  // labels available to compare against, instead of only the auto-detected one.
+  return state.modeOverride && state.modeOverride !== 'auto' ? state.modeOverride : result.mode;
+}
+
+function updateStatus(result) {
+  statusBadge.textContent = state.playing ? 'Animating' : 'Ready';
+  statusBadge.className = state.playing ? 'text-cyan-400' : 'text-emerald-400';
+  const mode = displayedMode(result);
+  const overrideTag = (state.modeOverride && state.modeOverride !== 'auto') ? ' (forced)' : '';
+  let cls = 'badge cursor-pointer ' + (mode === 'CCM' ? 'badge-ccm' : 'badge-dcm');
+  modeBadge.className = cls; modeBadge.textContent = mode + overrideTag;
+  if (state.params.alpha > 90 && state.type.indexOf('controlled') !== -1 && state.type.indexOf('uncontrolled') === -1) {
+    modeBadge.className = 'badge badge-inverter cursor-pointer'; modeBadge.textContent = mode + overrideTag + ' · INVERSION';
+  }
+  const a = state.params.alpha;
+  alphaBetaReadout.textContent = (state.type.indexOf('uncontrolled') === -1 ? 'α=' + a + '°  ' : '') + 'Vdc=' + result.metrics.Vdc.toFixed(1) + 'V';
+}
+
+// ============================================================
+// CIRCUIT SVG COMPONENT LIBRARY
+// ============================================================
+function svgWire(x1, y1, x2, y2, on) {
+  const color = on ? '#22d3ee' : '#475569';
+  let html = `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="2"/>`;
+  if (on) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    const dur = Math.max(0.3, len / 280).toFixed(2) + 's';
+    html += `<circle r="3.5" fill="#c084fc">
+      <animateMotion dur="${dur}" repeatCount="indefinite" path="M ${x1} ${y1} L ${x2} ${y2}"/>
+    </circle>`;
+  }
+  return html;
+}
+function svgDot(x, y) { return `<circle cx="${x}" cy="${y}" r="3" fill="#94a3b8"/>`; }
+
+function svgACSource(cx, cy, r) {
+  return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#94a3b8" stroke-width="2"/>
+    <path d="M ${cx - r * 0.55} ${cy} q ${r * 0.28} -${r * 0.6} ${r * 0.55} 0 q ${r * 0.28} ${r * 0.6} ${r * 0.55} 0" fill="none" stroke="#94a3b8" stroke-width="1.6"/>
+    <text x="${cx}" y="${cy + r + 14}" text-anchor="middle" fill="#64748b" font-size="10">v<tspan baseline-shift="sub" font-size="8">s</tspan></text>`;
+}
+
+// diode pointing left->right (anode left, cathode right); rotate 90 for vertical (anode top).
+// `reversed` mirrors the symbol left-right in place (cathode left / anode right) —
+// used for the bottom (common-anode) group of a 6-pulse bridge, where the anode
+// must face the shared −rail, not the incoming phase line.
+function svgDiode(cx, cy, w, vertical, on, label, reversed) {
+  const c = on ? '#f59e0b' : '#64748b';
+  const cls = on ? 'device-on' : 'device-off';
+  if (!vertical) {
+    const dir = reversed ? -1 : 1;
+    const X = u => cx + dir * u;
+    const xLeadIn = X(-w / 2 - 14), xAnode = X(-w / 2), xBand = X(-w / 2 + 16), xLeadOut = X(w / 2 + 14);
+    return `<g class="${cls}" style="color:${c}">
+      <line x1="${xLeadIn}" y1="${cy}" x2="${xAnode}" y2="${cy}" stroke="${c}" stroke-width="2"/>
+      <polygon points="${xAnode},${cy - 8} ${xAnode},${cy + 8} ${xBand},${cy}" fill="${c}"/>
+      <line x1="${xBand}" y1="${cy - 8}" x2="${xBand}" y2="${cy + 8}" stroke="${c}" stroke-width="2.5"/>
+      <line x1="${xBand}" y1="${cy}" x2="${xLeadOut}" y2="${cy}" stroke="${c}" stroke-width="2"/>
+      <text x="${cx}" y="${cy - 14}" text-anchor="middle" fill="${c}" font-size="10" font-weight="700">${label}</text>
+    </g>`;
+  } else {
+    const y1 = cy - w / 2, y2 = cy + w / 2;
+    return `<g class="${cls}" style="color:${c}">
+      <line x1="${cx}" y1="${y1 - 14}" x2="${cx}" y2="${y1}" stroke="${c}" stroke-width="2"/>
+      <polygon points="${cx - 8},${y1} ${cx + 8},${y1} ${cx},${y1 + 16}" fill="${c}"/>
+      <line x1="${cx - 8}" y1="${y1 + 16}" x2="${cx + 8}" y2="${y1 + 16}" stroke="${c}" stroke-width="2.5"/>
+      <line x1="${cx}" y1="${y1 + 16}" x2="${cx}" y2="${y2 + 14}" stroke="${c}" stroke-width="2"/>
+      <text x="${cx + 22}" y="${cy + 4}" text-anchor="start" fill="${c}" font-size="10" font-weight="700">${label}</text>
+    </g>`;
+  }
+}
+
+// SCR = diode body + explicit gate lead terminating in a small circle, labeled "G".
+// Gate lead is routed clear of the main current path so it never overlaps other wires.
+// `reversed` — see svgDiode above; the gate lead mirrors along with the body.
+function svgSCR(cx, cy, w, vertical, on, label, gateFlash, reversed) {
+  const c = on ? '#10b981' : '#64748b';
+  const gc = gateFlash ? '#facc15' : '#eab308';
+  const cls = on ? 'device-on' : 'device-off';
+  if (!vertical) {
+    const dir = reversed ? -1 : 1;
+    const X = u => cx + dir * u;
+    const xLeadIn = X(-w / 2 - 14), xAnode = X(-w / 2), xBand = X(-w / 2 + 16), xLeadOut = X(w / 2 + 14);
+    const xGateA = X(-w / 2 + 6), xGateB = X(-w / 2 - 6);
+    return `<g class="${cls}" style="color:${c}">
+      <line x1="${xLeadIn}" y1="${cy}" x2="${xAnode}" y2="${cy}" stroke="${c}" stroke-width="2"/>
+      <polygon points="${xAnode},${cy - 8} ${xAnode},${cy + 8} ${xBand},${cy}" fill="${c}"/>
+      <line x1="${xBand}" y1="${cy - 8}" x2="${xBand}" y2="${cy + 8}" stroke="${c}" stroke-width="2.5"/>
+      <line x1="${xBand}" y1="${cy}" x2="${xLeadOut}" y2="${cy}" stroke="${c}" stroke-width="2"/>
+      <line x1="${xGateA}" y1="${cy + 6}" x2="${xGateB}" y2="${cy + 22}" stroke="${gc}" stroke-width="1.6"/>
+      <circle cx="${xGateB}" cy="${cy + 26}" r="2.5" fill="${gc}"/>
+      <text x="${xGateB}" y="${cy + 40}" text-anchor="middle" fill="${gc}" font-size="8.5">G</text>
+      <text x="${cx}" y="${cy - 16}" text-anchor="middle" fill="${c}" font-size="10" font-weight="700">${label}</text>
+    </g>`;
+  } else {
+    const y1 = cy - w / 2, y2 = cy + w / 2;
+    return `<g class="${cls}" style="color:${c}">
+      <line x1="${cx}" y1="${y1 - 14}" x2="${cx}" y2="${y1}" stroke="${c}" stroke-width="2"/>
+      <polygon points="${cx - 8},${y1} ${cx + 8},${y1} ${cx},${y1 + 16}" fill="${c}"/>
+      <line x1="${cx - 8}" y1="${y1 + 16}" x2="${cx + 8}" y2="${y1 + 16}" stroke="${c}" stroke-width="2.5"/>
+      <line x1="${cx}" y1="${y1 + 16}" x2="${cx}" y2="${y2 + 14}" stroke="${c}" stroke-width="2"/>
+      <line x1="${cx + 6}" y1="${y1 + 6}" x2="${cx + 24}" y2="${y1 - 6}" stroke="${gc}" stroke-width="1.6"/>
+      <circle cx="${cx + 28}" cy="${y1 - 8}" r="2.5" fill="${gc}"/>
+      <text x="${cx + 28}" y="${y1 - 14}" text-anchor="middle" fill="${gc}" font-size="8.5">G</text>
+      <text x="${cx - 14}" y="${cy + 4}" text-anchor="end" fill="${c}" font-size="10" font-weight="700">${label}</text>
+    </g>`;
+  }
+}
+
+function svgResistor(cx, cy, w, on) {
+  const c = on ? '#a78bfa' : '#64748b';
+  const x1 = cx - w / 2, n = 6, seg = w / n;
+  let path = `M ${x1} ${cy}`;
+  for (let k = 0; k < n; k++) {
+    const x = x1 + seg * (k + 1);
+    const y = cy + (k % 2 === 0 ? -8 : 8);
+    path += ` L ${x} ${k === n - 1 ? cy : y}`;
+  }
+  return `<g><path d="${path}" fill="none" stroke="${c}" stroke-width="2"/>
+    <text x="${cx}" y="${cy - 14}" text-anchor="middle" fill="${c}" font-size="10">R</text></g>`;
+}
+function svgInductor(cx, cy, w, on) {
+  const c = on ? '#a78bfa' : '#64748b';
+  const x1 = cx - w / 2, n = 4, seg = w / n;
+  let arcs = '';
+  for (let k = 0; k < n; k++) arcs += `<path d="M ${x1 + seg * k} ${cy} A ${seg / 2} 10 0 0 1 ${x1 + seg * (k + 1)} ${cy}" fill="none" stroke="${c}" stroke-width="2"/>`;
+  return `<g>${arcs}<text x="${cx}" y="${cy - 16}" text-anchor="middle" fill="${c}" font-size="10">L</text></g>`;
+}
+function svgBattery(cx, cy, w, on) {
+  const c = on ? '#a78bfa' : '#64748b';
+  return `<g>
+    <line x1="${cx - w / 2}" y1="${cy - 12}" x2="${cx - w / 2}" y2="${cy + 12}" stroke="${c}" stroke-width="3"/>
+    <line x1="${cx - w / 2 + 8}" y1="${cy - 6}" x2="${cx - w / 2 + 8}" y2="${cy + 6}" stroke="${c}" stroke-width="1.5"/>
+    <text x="${cx}" y="${cy - 18}" text-anchor="middle" fill="${c}" font-size="10">E</text></g>`;
+}
+
+function stateAt(result, theta) {
+  if (theta == null) return { branch: 'MAIN', sel: result.sel[Math.floor(result.sel.length * 0.15)] };
+  // find nearest sample
+  const N = result.theta.length;
+  const span = result.theta[N - 1] - result.theta[0];
+  let t = theta;
+  while (t < result.theta[0]) t += span;
+  while (t > result.theta[N - 1]) t -= span;
+  let idx = Math.round((t - result.theta[0]) / span * (N - 1));
+  idx = Math.max(0, Math.min(N - 1, idx));
+  return { branch: result.branch[idx], sel: result.sel[idx], idx, io: result.io[idx], vo: result.vo[idx], vs: result.vs[idx], is: result.is[idx], vT: result.vT[idx], devLabel: result.devLabel[idx], theta: result.theta[idx] };
+}
+
+// ============================================================
+// TOPOLOGY-SPECIFIC CIRCUIT LAYOUTS
+// ============================================================
+function loadStackSVG(x, cy, load) {
+  // returns {svg, endX} drawing R (+ L, + E) in series along a horizontal run starting at x
+  let cx = x, parts = '';
+  parts += svgWire(cx, cy, cx + 40, cy, false);
+  cx += 40;
+  parts += svgResistor(cx + 20, cy, 40, true); cx += 40;
+  if (load.indexOf('L') !== -1 && load !== 'R') { parts += svgWire(cx, cy, cx + 15, cy, false); cx += 15; parts += svgInductor(cx + 22, cy, 44, true); cx += 44; }
+  if (load.indexOf('E') !== -1) { parts += svgWire(cx, cy, cx + 15, cy, false); cx += 15; parts += svgBattery(cx + 10, cy, 20, true); cx += 20; }
+  parts += svgWire(cx, cy, cx + 30, cy, false); cx += 30;
+  return { svg: parts, endX: cx };
+}
+
+function renderCircuit(result, theta) {
+  const s = stateAt(result, theta);
+  const topo = result.topo;
+  const load = state.load;
+  let svg = '';
+  let W = 680, H = 300; // generous default canvas; overridden per-topology below to avoid clipping (req #5)
+
+  if (topo.nPoles === 1) {
+    H = 280;
+    const mainOn = s.branch === 'MAIN';
+    const fwdOn = s.branch === 'FWD';
+    svg += svgACSource(60, 130, 34);
+    svg += svgWire(94, 130, 150, 130, mainOn);
+    svg += (topo.isControlled ? svgSCR(182, 130, 40, false, mainOn, topo.poleLabels[0], false)
+      : svgDiode(182, 130, 40, false, mainOn, topo.poleLabels[0]));
+    svg += svgWire(214, 130, 264, 130, mainOn);
+    const ld = loadStackSVG(264, 130, load);
+    svg += ld.svg;
+    const rightX = ld.endX + 14;
+    svg += svgWire(rightX, 130, rightX, 220, mainOn || fwdOn);
+    svg += svgWire(60, 220, rightX, 220, mainOn || fwdOn);
+    svg += svgWire(60, 164, 60, 220, mainOn || fwdOn);
+    if (topo.hasFWD) {
+      svg += svgWire(304, 130, 304, 168, fwdOn);
+      svg += svgDiode(304, 188, 34, true, fwdOn, topo.fwdLabel);
+      svg += svgWire(304, 206, 304, 220, fwdOn);
+    }
+    W = Math.max(680, rightX + 60);
+    svg += `<text x="${W / 2}" y="${H - 14}" text-anchor="middle" fill="#94a3b8" font-size="10">${mainOn ? (topo.poleLabels[0] + ' conducting') : (fwdOn ? topo.fwdLabel + ' freewheeling' : 'blocking (OFF)')}</text>`;
+
+  } else if (topo.nPoles === 2) {
+    H = 340;
+    const mainOn = s.branch === 'MAIN', fwdOn = s.branch === 'FWD';
+    const idx = s.sel ? s.sel.index : 0;
+    const devFn = (x, y, vert, on, label) => topo.isControlled ? svgSCR(x, y, 32, vert, on, label, false) : svgDiode(x, y, 32, vert, on, label);
+    const topY = 70, botY = 270, midY = 170, srcX = 70, lNodeX = 150, devX = 230, rNodeX = 320;
+
+    svg += svgACSource(srcX, midY, 34);
+    // left node connects to both top-left and bottom-left devices
+    svg += svgWire(srcX + 34, midY, lNodeX, midY, true);
+    svg += svgDot(lNodeX, midY);
+    svg += svgWire(lNodeX, midY, lNodeX, topY, mainOn && idx === 0);
+    svg += svgWire(lNodeX, topY, devX - 16, topY, mainOn && idx === 0);
+    svg += devFn(devX, topY, false, mainOn && idx === 0, topo.poleLabels[0]);
+    svg += svgWire(devX + 16, topY, rNodeX, topY, mainOn && idx === 0);
+
+    svg += svgWire(lNodeX, midY, lNodeX, botY, mainOn && idx === 1);
+    svg += svgWire(lNodeX, botY, devX - 16, botY, mainOn && idx === 1);
+    svg += devFn(devX, botY, false, mainOn && idx === 1, topo.poleLabels[1]);
+    svg += svgWire(devX + 16, botY, rNodeX, botY, mainOn && idx === 1);
+
+    svg += svgDot(rNodeX, topY); svg += svgDot(rNodeX, botY);
+    svg += svgWire(rNodeX, topY, rNodeX, botY, mainOn);
+
+    // output taken from rNodeX,topY (+) through load, returning to rNodeX,botY (-)
+    const outY = topY;
+    svg += svgWire(rNodeX, outY, rNodeX + 50, outY, mainOn);
+    const ld = loadStackSVG(rNodeX + 50, outY, load);
+    svg += ld.svg;
+    const returnX = ld.endX + 10;
+    svg += svgWire(ld.endX, outY, returnX, outY, mainOn);
+    svg += svgWire(returnX, outY, returnX, botY, mainOn);
+    svg += svgWire(returnX, botY, rNodeX, botY, true);
+
+    if (topo.hasFWD) {
+      const fx = rNodeX + 20;
+      svg += svgWire(fx, topY, fx, topY + 40, fwdOn);
+      svg += svgDiode(fx, topY + 60, 34, true, fwdOn, topo.fwdLabel);
+      svg += svgWire(fx, topY + 78, fx, botY, fwdOn);
+    }
+
+    W = Math.max(680, returnX + 80);
+    svg += `<text x="${W / 2}" y="${H - 14}" text-anchor="middle" fill="#94a3b8" font-size="10">${mainOn ? (result.devLabel[s.idx] + ' conducting') : (fwdOn ? topo.fwdLabel + ' freewheeling' : 'blocking (OFF)')}</text>`;
+
+  } else if (topo.threePhase && !topo.isBridge6) {
+    H = 300;
+    const idx = s.sel ? s.sel.index : 0;
+    const ys = [60, 150, 240];
+    ys.forEach((y, k) => {
+      svg += svgACSource(60, y, 28);
+      svg += svgWire(88, y, 160, y, s.branch === 'MAIN' && idx === k);
+      const on = s.branch === 'MAIN' && idx === k;
+      svg += (topo.isControlled ? svgSCR(196, y, 34, false, on, topo.poleLabels[k], false) : svgDiode(196, y, 34, false, on, topo.poleLabels[k]));
+      svg += svgWire(230, y, 300, y, on);
+      svg += svgWire(300, y, 300, 150, on);
+    });
+    svg += svgDot(300, 150);
+    svg += svgWire(300, 150, 350, 150, true);
+    const ld = loadStackSVG(350, 150, load);
+    svg += ld.svg;
+    const returnX = ld.endX + 14;
+    svg += svgWire(ld.endX, 150, returnX, 150, true);
+    svg += svgWire(returnX, 150, returnX, H - 40, true);
+    svg += svgWire(60, H - 40, returnX, H - 40, true);
+    svg += svgWire(60, 88, 60, H - 40, true);
+    W = Math.max(680, returnX + 60);
+    svg += `<text x="${W / 2}" y="${H - 14}" text-anchor="middle" fill="#94a3b8" font-size="10">Conducting: ${s.branch === 'MAIN' ? topo.poleLabels[idx] : 'none'} · N (neutral) return</text>`;
+
+  } else if (topo.isBridge6) {
+    // Generous spacing so devices never collide: an SCR's on-screen envelope
+    // spans roughly 26px above its center (label) to 48px below (gate lead +
+    // "G" label), i.e. ~74px tall. With a 55px offset from the phase line and
+    // a 210px gap between phase rows, adjacent devices (e.g. phase-0's bottom
+    // device vs. phase-1's top device) still keep a ~26px clear margin.
+    const offset = 55, rowGap = 210;
+    const ys = [100, 100 + rowGap, 100 + 2 * rowGap]; // [100, 310, 520]
+    const railTopY = 30, railBotY = ys[2] + offset + 48 + 30; // clears the last device's gate label
+    H = railBotY + 40;
+    const topIdx = s.sel ? s.sel.topIndex : 0, botIdx = s.sel ? s.sel.bottomIndex : 0;
+    ys.forEach((y, k) => {
+      const topY = y - offset, botY = y + offset;
+      svg += svgACSource(55, y, 26);
+      svg += svgWire(81, y, 170, y, s.branch === 'MAIN' && (topIdx === k || botIdx === k));
+      const onTop = s.branch === 'MAIN' && topIdx === k;
+      const onBot = s.branch === 'MAIN' && botIdx === k;
+      // Top (common-cathode) group: anode faces the phase line, cathode faces +rail.
+      svg += svgWire(170, y, 170, topY, onTop);
+      svg += (topo.isControlled ? svgSCR(210, topY, 30, false, onTop, topo.topLbl[k], false, false) : svgDiode(210, topY, 30, false, onTop, topo.topLbl[k], false));
+      svg += svgWire(240, topY, 300, topY, onTop);
+      svg += svgWire(300, topY, 300, railTopY, onTop);
+      // Bottom (common-anode) group: reversed so the cathode faces the phase
+      // line and the anode faces −rail (current flows rail → phase here).
+      svg += svgWire(170, y, 170, botY, onBot);
+      svg += (topo.isControlled ? svgSCR(210, botY, 30, false, onBot, topo.botLbl[k], false, true) : svgDiode(210, botY, 30, false, onBot, topo.botLbl[k], true));
+      svg += svgWire(240, botY, 300, botY, onBot);
+      svg += svgWire(300, botY, 300, railBotY, onBot);
+    });
+    svg += svgDot(300, railTopY); svg += svgDot(300, railBotY);
+    svg += svgWire(300, railTopY, 350, railTopY, true);
+    const ld = loadStackSVG(350, railTopY, load);
+    svg += ld.svg;
+    const returnX = ld.endX + 14;
+    svg += svgWire(ld.endX, railTopY, returnX, railTopY, true);
+    svg += svgWire(returnX, railTopY, returnX, railBotY, true);
+    svg += svgWire(returnX, railBotY, 300, railBotY, true);
+    W = Math.max(680, returnX + 60);
+    svg += `<text x="${W / 2}" y="${H - 14}" text-anchor="middle" fill="#94a3b8" font-size="10">Conducting: ${s.branch === 'MAIN' ? (topo.topLbl[topIdx] + ' + ' + topo.botLbl[botIdx]) : 'none'}</text>`;
+  }
+
+  circuitContainer.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="h-auto" style="min-width:${Math.min(W, 900)}px;max-width:100%;">${svg}</svg>`;
+  circuitStateLabel.textContent = s.branch === 'MAIN' ? '● live' : (s.branch === 'FWD' ? '● freewheel' : '○ blocking');
+  circuitStateLabel.className = 'normal-case ml-2 ' + (s.branch === 'MAIN' ? 'text-emerald-400' : s.branch === 'FWD' ? 'text-amber-400' : 'text-slate-600');
+}
+
+// ============================================================
+// WAVEFORM PLOTTING (SVG, angular ωt axis) — one chart PER KIND,
+// stacked vertically (never overlapping different kinds of signal).
+// ============================================================
+const SIGNAL_COLORS = { vs: '#38bdf8', vo: '#34d399', io: '#f472b6', is: '#fbbf24', vT: '#a78bfa', ig: '#f87171' };
+const SIGNAL_LABELS = { vs: 'v_s', vo: 'v_o', io: 'i_o', is: 'i_s', vT: 'v_T', ig: 'gate' };
+
+function activeSignals() {
+  return Array.from(document.querySelectorAll('.signal-toggle')).filter(cb => cb.checked).map(cb => cb.dataset.signal);
+}
+
+// Generic shared chart builder used for every stacked panel (voltage / current /
+// gate / 3-phase source voltages). Draws: 0,π,2π,3π,4π as solid labeled
+// gridlines, and π/2,3π/2,5π/2,7π/2 as dotted unlabeled gridlines (req. #6).
+function buildChartSVG(theta, series, opts) {
+  const W = 900, H = opts.H || 210, padL = 46, padR = 20, padT = 20, padB = 26;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const thetaMin = theta[0], thetaMax = theta[theta.length - 1];
+  const xScale = th => padL + (th - thetaMin) / (thetaMax - thetaMin) * plotW;
+
+  let maxAbs = opts.fixedMax || 1;
+  if (!opts.fixedMax) series.forEach(s => { for (let k = 0; k < s.values.length; k++) maxAbs = Math.max(maxAbs, Math.abs(s.values[k])); });
+  maxAbs *= 1.18;
+  const yMid = padT + plotH / 2;
+  const yScale = v => yMid - (v / maxAbs) * (plotH / 2);
+
+  function pathFor(arr) {
+    let d = '';
+    for (let k = 0; k < theta.length; k++) {
+      d += (k === 0 ? 'M' : 'L') + xScale(theta[k]).toFixed(1) + ' ' + yScale(arr[k]).toFixed(1) + ' ';
+    }
+    return d;
+  }
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">`;
+
+  // solid gridlines at multiples of π (labeled)
+  for (let g = Math.ceil(thetaMin / Math.PI) * Math.PI; g <= thetaMax + 1e-6; g += Math.PI) {
+    const x = xScale(g);
+    svg += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${padT + plotH}" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>`;
+    const nQ = Math.round(g / Math.PI * 2);
+    const label = nQ === 0 ? '0' : (nQ % 2 === 0 ? (nQ / 2 === 1 ? 'π' : (nQ / 2) + 'π') : (nQ + 'π/2'));
+    if (opts.showXLabels !== false) svg += `<text x="${x}" y="${H - 6}" text-anchor="middle" fill="#64748b" font-size="10" class="mono">${label}</text>`;
+  }
+  // dotted gridlines at odd multiples of π/2 (π/2, 3π/2, 5π/2, ...) — kept
+  // visually distinct from the solid π-multiple lines above: dashed stroke,
+  // dimmer, smaller unlabeled-looking label so it never competes with 0,π,2π.
+  for (let g = Math.ceil((thetaMin - Math.PI / 2) / Math.PI) * Math.PI + Math.PI / 2; g <= thetaMax + 1e-6; g += Math.PI) {
+    if (g < thetaMin) continue;
+    const x = xScale(g);
+    svg += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${padT + plotH}" stroke="rgba(255,255,255,0.10)" stroke-width="1" stroke-dasharray="2,4"/>`;
+    if (opts.showXLabels !== false) {
+      const nQ = Math.round(g / Math.PI * 2); // odd integer: 1,3,5,...
+      const label = nQ === 1 ? 'π/2' : nQ + 'π/2';
+      svg += `<text x="${x}" y="${H - 6}" text-anchor="middle" fill="#475569" font-size="8.5" class="mono">${label}</text>`;
+    }
+  }
+  // alpha firing markers (dashed amber)
+  if (opts.alphaRad != null) {
+    const a = opts.alphaRad;
+    for (let k = 0; k < 5; k++) {
+      const pos = a + k * (opts.alphaPeriod || Math.PI);
+      if (pos >= thetaMin && pos <= thetaMax) {
+        const x = xScale(pos);
+        svg += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${padT + plotH}" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3,3" opacity="0.55"/>`;
+      }
+    }
+  }
+  svg += `<line x1="${padL}" y1="${yMid}" x2="${padL + plotW}" y2="${yMid}" stroke="rgba(255,255,255,0.14)" stroke-width="1"/>`;
+
+  if (opts.gatePulses) {
+    for (let k = 0; k < theta.length; k++) {
+      if (opts.gatePulses[k]) {
+        const x = xScale(theta[k]);
+        svg += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${padT + plotH}" stroke="${SIGNAL_COLORS.ig}" stroke-width="2.4"/>`;
+      }
+    }
+  } else {
+    series.forEach(s => { svg += `<path d="${pathFor(s.values)}" fill="none" stroke="${s.color}" stroke-width="1.9" ${s.dashed ? 'stroke-dasharray="5,4"' : ''}/>`; });
+  }
+
+  svg += `<text x="6" y="${padT + 10}" fill="#64748b" font-size="9">+</text>`;
+  svg += `<text x="6" y="${padT + plotH - 2}" fill="#64748b" font-size="9">−</text>`;
+
+  let lx = padL;
+  series.forEach(s => {
+    svg += `<circle cx="${lx}" cy="${padT - 8}" r="3" fill="${s.color}"/><text x="${lx + 8}" y="${padT - 4}" fill="#94a3b8" font-size="10">${s.label}</text>`;
+    lx += 12 + s.label.length * 6.2 + 14;
+  });
+
+  svg += '</svg>';
+  return { svg, meta: { thetaMin, thetaMax, padL, plotW, W, H } };
+}
+
+function chartPanelHTML(title, svg) {
+  return `<div class="chart-panel"><div class="chart-panel-title">${title}</div>${svg}</div>`;
+}
+
+const CHART_TITLES = { vs: 'Source Voltage — v_s', vo: 'Output Voltage — v_o', io: 'Load Current — i_o', is: 'Source Current — i_s', vT: 'Device Voltage — v_T' };
+
+function renderWaveforms(result) {
+  const theta = result.theta;
+  const sigs = activeSignals();
+  const showGate = sigs.indexOf('ig') !== -1;
+  const dataSigs = sigs.filter(s => s !== 'ig');
+  const alphaRad = result.topo.isControlled ? state.params.alpha * Math.PI / 180 : null;
+  const alphaPeriod = result.topo.firingPeriod || Math.PI;
+
+  let html = '';
+  let lastMeta = null;
+  const allPanels = dataSigs.concat(showGate ? ['ig'] : []);
+
+  dataSigs.forEach((s, i) => {
+    const isLast = !showGate && i === dataSigs.length - 1;
+    const series = [{ label: SIGNAL_LABELS[s], color: SIGNAL_COLORS[s], values: result[s] }];
+    const { svg, meta } = buildChartSVG(theta, series, { H: 170, alphaRad, alphaPeriod, showXLabels: isLast });
+    html += chartPanelHTML(CHART_TITLES[s], svg);
+    lastMeta = meta;
+  });
+  if (showGate) {
+    const { svg, meta } = buildChartSVG(theta, [], { H: 90, alphaRad, alphaPeriod, gatePulses: result.ig, fixedMax: 1, showXLabels: true });
+    html += chartPanelHTML('Gate Pulses', svg);
+    lastMeta = meta;
+  }
+  if (!html) html = '<div class="text-sm text-slate-500 p-6 text-center">Select at least one signal above to plot.</div>';
+
+  waveformWrapper.innerHTML = html;
+  waveformWrapper._meta = lastMeta;
+  updateCursorVisual(result);
+}
+
+// ============================================================
+// 3-PHASE SOURCE PANEL — shown first for 3-phase converters (req #4):
+// primary phase voltages, then line voltages, each its own chart.
+// ============================================================
+function renderThreePhaseSource(result) {
+  const wrap = $('source-panel-wrap');
+  if (!result.topo.threePhase) { wrap.classList.add('hidden'); wrap.innerHTML = ''; return; }
+  wrap.classList.remove('hidden');
+  const theta = result.theta;
+  const { va, vb, vc } = result.topo.phases;
+  const vaArr = theta.map(va), vbArr = theta.map(vb), vcArr = theta.map(vc);
+  const vabArr = theta.map(t => va(t) - vb(t)), vbcArr = theta.map(t => vb(t) - vc(t)), vcaArr = theta.map(t => vc(t) - va(t));
+
+  const phaseChart = buildChartSVG(theta, [
+    { label: 'v_an', color: '#f43f5e', values: vaArr },
+    { label: 'v_bn', color: '#22d3ee', values: vbArr },
+    { label: 'v_cn', color: '#34d399', values: vcArr },
+  ], { H: 190, showXLabels: false });
+
+  const lineChart = buildChartSVG(theta, [
+    { label: 'v_ab', color: '#22d3ee', values: vabArr, dashed: true },
+    { label: 'v_bc', color: '#e879f9', values: vbcArr, dashed: true },
+    { label: 'v_ca', color: '#facc15', values: vcaArr, dashed: true },
+  ], { H: 190, showXLabels: true });
+
+  wrap.innerHTML = chartPanelHTML('Source Phase Voltages (primary 3-phase input)', phaseChart.svg) +
+    chartPanelHTML('Source Line Voltages', lineChart.svg);
+}
+
+// ============================================================
+// CONDUCTION TIMELINE
+// ============================================================
+function renderTimeline(result) {
+  const theta = result.theta, branch = result.branch, sel = result.sel;
+  const thetaMin = theta[0], thetaMax = theta[theta.length - 1], span = thetaMax - thetaMin;
+  const topo = result.topo;
+
+  // build device track list
+  const tracks = [];
+  if (topo.nPoles === 1) {
+    tracks.push({ name: topo.poleLabels[0], color: '#f59e0b', test: k => branch[k] === 'MAIN' });
+    if (topo.hasFWD) tracks.push({ name: topo.fwdLabel, color: '#f472b6', test: k => branch[k] === 'FWD' });
+  } else if (topo.nPoles === 2) {
+    tracks.push({ name: topo.poleLabels[0], color: '#10b981', test: k => branch[k] === 'MAIN' && sel[k].index === 0 });
+    tracks.push({ name: topo.poleLabels[1], color: '#06b6d4', test: k => branch[k] === 'MAIN' && sel[k].index === 1 });
+    if (topo.hasFWD) tracks.push({ name: topo.fwdLabel, color: '#f472b6', test: k => branch[k] === 'FWD' });
+  } else if (topo.threePhase && !topo.isBridge6) {
+    const colors = ['#10b981', '#06b6d4', '#f472b6'];
+    topo.poleLabels.forEach((lbl, idx) => tracks.push({ name: lbl, color: colors[idx], test: k => branch[k] === 'MAIN' && sel[k].index === idx }));
+  } else if (topo.isBridge6) {
+    const colors = ['#10b981', '#06b6d4', '#f472b6', '#facc15', '#a78bfa', '#fb7185'];
+    for (let idx = 0; idx < 3; idx++) tracks.push({ name: topo.topLbl[idx], color: colors[idx], test: k => branch[k] === 'MAIN' && sel[k].topIndex === idx });
+    for (let idx = 0; idx < 3; idx++) tracks.push({ name: topo.botLbl[idx], color: colors[idx + 3], test: k => branch[k] === 'MAIN' && sel[k].bottomIndex === idx });
+  }
+
+  let html = '';
+  tracks.forEach(tr => {
+    let segs = [], startK = null;
+    for (let k = 0; k < theta.length; k++) {
+      const on = tr.test(k);
+      if (on && startK === null) startK = k;
+      if (!on && startK !== null) { segs.push([startK, k - 1]); startK = null; }
+    }
+    if (startK !== null) segs.push([startK, theta.length - 1]);
+    const bars = segs.map(([a, b]) => {
+      const left = (theta[a] - thetaMin) / span * 100;
+      const width = Math.max(0.3, (theta[b] - theta[a]) / span * 100);
+      return `<div class="timeline-seg" style="left:${left}%;width:${width}%;background:${tr.color};box-shadow:0 0 6px ${tr.color}88;"></div>`;
+    }).join('');
+    html += `<div class="timeline-row"><span class="text-xs mono text-slate-400">${tr.name}</span><div class="timeline-bar">${bars}</div></div>`;
+  });
+  timelineContainer.innerHTML = html;
+}
+
+// ============================================================
+// METRICS DASHBOARD (analytic vs simulated where available)
+// ============================================================
+function analyticVdc(result) {
+  const type = state.type, load = state.load, a = state.params.alpha * Math.PI / 180;
+  const Vm = result.Vm;
+  const mode = displayedMode(result);
+  if (mode === 'DCM') return null; // textbook CCM formulas don't hold in DCM
+  if (type === 'half-wave-uncontrolled' && load === 'R') return Vm / Math.PI;
+  if (type === 'half-wave-controlled' && load === 'R') return Vm / (2 * Math.PI) * (1 + Math.cos(a));
+  if (type === 'full-wave-uncontrolled-bridge') return 2 * Vm / Math.PI;
+  if (type === 'full-wave-controlled-bridge') return 2 * Vm / Math.PI * Math.cos(a);
+  if (type === 'semi-converter') return Math.SQRT2 * state.params.Vrms / Math.PI * (1 + Math.cos(a));
+  if (type === 'three-phase-half-wave-uncontrolled') return 3 * Math.sqrt(3) / (2 * Math.PI) * Vm;
+  if (type === 'three-phase-half-wave-controlled') return 3 * Math.sqrt(3) / (2 * Math.PI) * Vm * Math.cos(a);
+  if (type === 'three-phase-full-wave-uncontrolled-bridge') return 3 * Math.sqrt(3) / Math.PI * Vm;
+  if (type === 'three-phase-full-wave-controlled-bridge') return 3 * Math.sqrt(3) / Math.PI * Vm * Math.cos(a);
+  return null;
+}
+
+function metricCard(label, value, sub) {
+  return `<div class="metric-card"><div class="metric-label">${label}</div><div class="metric-value">${value}</div>${sub ? `<div class="text-[10px] text-slate-500 mt-0.5">${sub}</div>` : ''}</div>`;
+}
+
+function renderMetrics(result) {
+  const m = result.metrics;
+  const av = analyticVdc(result);
+  let html = '';
+  html += metricCard('V<sub>dc</sub>', m.Vdc.toFixed(1) + ' V');
+  html += metricCard('I<sub>dc</sub>', m.Idc.toFixed(2) + ' A');
+  html += metricCard('V<sub>rms</sub>', m.Vrms.toFixed(1) + ' V');
+  html += metricCard('I<sub>rms</sub>', m.Irms.toFixed(2) + ' A');
+  html += metricCard('P.F.', m.PF.toFixed(3));
+  html += metricCard('D.F.', m.DF.toFixed(3));
+  html += metricCard('DPF', m.DPF.toFixed(3), 'cos φ₁');
+  html += metricCard('THD (i<sub>s</sub>)', (m.THD * 100).toFixed(1) + '%');
+  html += metricCard('R.F.', m.RF.toFixed(3));
+  html += metricCard('P<sub>avg</sub>', m.Pavg.toFixed(0) + ' W');
+  metricsGrid.innerHTML = html;
+
+  if (av !== null) {
+    const err = Math.abs(m.Vdc - av) / Math.max(1e-6, Math.abs(av)) * 100;
+    errorReadout.innerHTML = `V<sub>dc</sub> analytic = ${av.toFixed(1)} V &nbsp;|&nbsp; simulated = ${m.Vdc.toFixed(1)} V &nbsp;|&nbsp; error = ${err.toFixed(2)}%`;
+  } else {
+    errorReadout.textContent = displayedMode(result) === 'DCM' ? 'DCM: closed-form CCM formula not applicable — value is fully simulated' : '';
+  }
+}
+
+function renderHarmonics(result) {
+  const h = result.metrics.harmonics;
+  const maxRms = Math.max(0.001, ...h.map(x => x.rms));
+  let html = '<div class="flex items-end gap-4 h-28 px-2">';
+  h.forEach(x => {
+    const hpx = Math.max(2, (x.rms / maxRms) * 90);
+    html += `<div class="flex flex-col items-center gap-1 flex-1">
+      <div class="text-[10px] mono text-slate-400">${x.rms.toFixed(2)}A</div>
+      <div style="height:${hpx}px;width:60%;background:${x.n === 1 ? '#38bdf8' : '#8b5cf6'};border-radius:3px 3px 0 0;"></div>
+      <div class="text-[10px] mono text-slate-500">n=${x.n}</div>
+    </div>`;
+  });
+  html += '</div>';
+  harmonicsContainer.innerHTML = html;
+}
+
+// ============================================================
+// EDUCATIONAL PANEL (dynamic, reflects current branch/state)
+// ============================================================
+const EDU_CONTENT = {
+  'half-wave-uncontrolled': {
+    what: 'The single diode conducts whenever the source forward-biases it, connecting the source directly to the load; it blocks during the reverse half-cycle.',
+    why: 'A diode only allows current in one direction. With a resistive load the diode turns off the instant v_s crosses zero. With inductance present, the stored magnetic energy keeps forcing current forward even after v_s goes negative, so conduction persists until an extinction angle β &gt; π.',
+    eq: 'V<sub>o,avg</sub> = V<sub>m</sub>/π &nbsp;(R load) &nbsp;·&nbsp; For RL: conduction continues to β where i(β)=0',
+    obs: ['Watch β move past π as you increase L — the inductor is fighting the diode\'s turn-off.', 'With E added, the diode won\'t even turn ON until v_s exceeds E.', 'Vdc is always positive but drops toward 0 as L → ∞ (pure L, symmetric conduction 0→2π).']
+  },
+  'half-wave-controlled': {
+    what: 'The single SCR is forced to wait for both a forward-biased anode and a gate pulse before it can turn on, at angle α.',
+    why: 'Delaying the firing angle α shortens the conduction interval and reduces the average output — this is how phase-control regulates DC voltage from a fixed AC source.',
+    eq: 'V<sub>O(dc)</sub> = V<sub>m</sub>/(2π) · (1 + cos α) &nbsp;(R load)',
+    obs: ['Increasing α delays firing → shorter conduction → lower V_dc.', 'With RLE, α must exceed α_min = sin⁻¹(E/V_m) or the SCR simply never sees forward bias long enough to fire.', 'Adding a freewheeling diode clips the SCR\'s conduction at π and lets the inductor current freewheel instead of forcing extended SCR conduction.']
+  },
+  'full-wave-uncontrolled-bridge': {
+    what: 'Two diode pairs alternately connect the load across the source every half-cycle, so the output always follows |v_s|.',
+    why: 'Because the output can never go negative, a passive RL load in this topology is naturally continuous (CCM) — current never needs to reach zero. Only a large opposing EMF (RLE) can force it into DCM near the notches of |v_s|.',
+    eq: 'V<sub>dc</sub> = 2V<sub>m</sub>/π',
+    obs: ['Toggle to an RLE load and raise E — watch the notches appear near each zero-crossing (DCM).', 'io ripples at twice the source frequency.']
+  },
+  'full-wave-controlled-bridge': {
+    what: 'All four SCRs are phase-controlled together: the diagonal pair fired most recently keeps conducting until the next pair fires at the next α point — even through zero-crossings of v_s.',
+    why: 'Because current keeps flowing through the same devices past π, v_o actually dips negative for part of each half-cycle once α&gt;0, which is exactly why the average output falls as cos α — and can go fully negative once α&gt;90°, meaning the converter is absorbing power from the DC side (line-commutated inversion) rather than delivering it.',
+    eq: 'V<sub>O(dc)</sub> = (2V<sub>m</sub>/π) · cos α &nbsp;·&nbsp; 0°&ndash;90°: rectification &nbsp;·&nbsp; 90°&ndash;180°: inversion',
+    obs: ['Push α past 90° and watch v_o spend most of its time negative.', 'Inversion needs a DC-side source (battery/motor back-EMF) actually able to push current — this simulator shows the voltage waveform; a real inverting load is modeled in the DC-motor drive page.']
+  },
+  'semi-converter': {
+    what: 'Two SCRs and two diodes form a converter that can only ever produce a positive or zero output — whenever the bridge output would try to go negative, a diode freewheels the load current instead.',
+    why: 'This built-in freewheeling path is why the semi-converter has a better power factor and lower ripple than a full converter at the same α, at the cost of losing the ability to invert.',
+    eq: 'V<sub>OAV</sub> = (√2·V<sub>i</sub>/π) · (1 + cos α)',
+    obs: ['Notice v_o never goes negative, unlike the full converter.', 'The freewheeling diode conducts near each zero-crossing, visible on the timeline.']
+  },
+  'three-phase-half-wave-uncontrolled': {
+    what: 'At every instant, whichever phase has the highest instantaneous voltage forward-biases its diode and supplies the load; the others are reverse biased.',
+    why: 'With three phases 120° apart, a new diode takes over every 120°, giving a ripple frequency of 3f — much smoother than single-phase rectification.',
+    eq: 'V<sub>dc</sub> = (3√3/2π) · V<sub>m</sub> &nbsp;≈&nbsp; 1.17 · V<sub>m</sub>',
+    obs: ['Each diode conducts for exactly 120° per cycle.', 'The output ripple frequency is 3× the line frequency.']
+  },
+  'three-phase-half-wave-controlled': {
+    what: 'Each SCR fires α degrees after the point where its phase naturally becomes the highest (the "natural commutation point").',
+    why: 'Delaying the firing point past the natural crossover reduces the average voltage the same way it does in single-phase phase control, but here the natural commutation reference itself shifts every 120°.',
+    eq: 'V<sub>dc</sub> = (3√3/2π) · V<sub>m</sub> · cos α',
+    obs: ['Try the preset α values (0°,15°,30°,60° for R; 30°,60°,90° for RL) — standard textbook operating points.', 'For RL loads, extended conduction beyond 120° per device is possible depending on α and L.']
+  },
+  'three-phase-full-wave-uncontrolled-bridge': {
+    what: 'Six diodes connect the load between whichever phase is instantaneously highest (top group) and whichever is instantaneously lowest (bottom group).',
+    why: 'This doubles the pulse number to 6 per cycle, giving very low ripple — the standard industrial 3-phase rectifier.',
+    eq: 'V<sub>dc</sub> = 3V<sub>m,L-L</sub>/π &nbsp;≈&nbsp; 0.955 · V<sub>m,L-L</sub>',
+    obs: ['Six 60°-wide conduction intervals per cycle, visible on the timeline.', 'Ripple frequency is 6f.']
+  },
+  'three-phase-full-wave-controlled-bridge': {
+    what: 'The 6-pulse firing sequence (T1…T6, each 60° apart) is delayed by α from the natural 60° commutation points.',
+    why: 'Because current transfers directly from one SCR pair to the next (no forced zero), the output voltage itself dips as α grows, following a clean cos α law — right up to inversion beyond 90°.',
+    eq: 'V<sub>O(dc)</sub> = (3√3/π) · V<sub>m</sub> · cos α',
+    obs: ['Watch the T1..T6 firing order in the timeline — each conducts 120°, overlapping by 60° with its neighbors, six pulses total.', 'Beyond α=90°, this becomes line-commutated inversion (needs an active DC-side source).']
+  }
+};
+
+function renderEducation(result, extra) {
+  const c = EDU_CONTENT[state.type];
+  if (!c) { eduPanel.innerHTML = ''; return; }
+  const s = stateAt(result, state.cursorTheta != null ? state.cursorTheta : state.playTheta);
+  let stateNote = '';
+  if (s.branch === 'FWD') stateNote = `<div class="edu-box">Right now the <b>freewheeling path</b> is active: the source is disconnected and the inductor's stored energy is circulating through the freewheeling device, holding v_o at 0 while current decays.</div>`;
+  else if (s.branch === 'OFF') stateNote = `<div class="edu-box">Right now <b>no device is conducting</b> — the load current has died out (discontinuous conduction) and the output floats at the load's EMF, waiting for the next device to become forward biased.</div>`;
+  else stateNote = `<div class="edu-box"><b>${result.devLabel[s.idx]}</b> is conducting, connecting the source directly to the load.</div>`;
+
+  eduPanel.innerHTML = `
+    <div><b class="text-slate-100">What happens?</b> ${c.what}</div>
+    <div><b class="text-slate-100">Why?</b> ${c.why}</div>
+    <div><b class="text-slate-100">Key equation:</b> <span class="mono text-cyan-300">${c.eq}</span></div>
+    <div><b class="text-slate-100">Observe:</b><ul class="list-disc pl-5">${c.obs.map(o => `<li>${o}</li>`).join('')}</ul></div>
+    ${stateNote}
+  `;
+}
+
+// ============================================================
+// CURSOR INTERACTION + ANIMATION
+// ============================================================
+// NOTE: waveform-container now lives inside the single whole-page #zoom-stage
+// transform, so the cursor-line/readout (its own descendants) get scaled
+// visually along with everything else automatically. All math here stays in
+// the container's own *local/unscaled* pixel space (offsetWidth), which keeps
+// it aligned with every panel (vo, io, gate pulses, ...) at any zoom level —
+// no manual scale factor needed.
+function updateCursorVisual(result) {
+  const meta = waveformWrapper._meta;
+  if (!meta) return;
+  const theta = state.cursorTheta != null ? state.cursorTheta : (state.playing ? state.playTheta : null);
+  const container = $('waveform-container');
+  const localWidth = container.offsetWidth;
+
+  if (theta == null) { cursorLine.style.display = 'none'; cursorReadout.style.display = 'none'; return; }
+  const s = stateAt(result, theta);
+  const xInSvg = meta.padL + (s.theta - meta.thetaMin) / (meta.thetaMax - meta.thetaMin) * meta.plotW;
+  const xPx = xInSvg * (localWidth / meta.W);
+  cursorLine.style.display = 'block';
+  cursorLine.style.left = xPx + 'px';
+
+  const thetaLabel = (s.theta / Math.PI).toFixed(2) + 'π';
+  let condLines = '';
+  if (result.topo.isBridge6) {
+    condLines = `${result.topo.topLbl[s.sel.topIndex]} = ${s.branch === 'MAIN' ? 'ON' : 'off'}\n${result.topo.botLbl[s.sel.bottomIndex]} = ${s.branch === 'MAIN' ? 'ON' : 'off'}`;
+  } else {
+    condLines = `${s.devLabel} = ${s.branch !== 'OFF' ? 'ON' : 'off'}`;
+  }
+  cursorReadout.style.display = 'block';
+  cursorReadout.style.left = Math.min(xPx + 10, localWidth - 190) + 'px';
+  cursorReadout.style.top = '8px';
+  cursorReadout.innerText =
+    `ωt = ${thetaLabel}\n\nvs = ${s.vs.toFixed(1)} V\nvo = ${s.vo.toFixed(1)} V\nio = ${s.io.toFixed(2)} A\nis = ${s.is.toFixed(2)} A\nvT = ${s.vT.toFixed(1)} V\n\n${condLines}`;
+
+  renderCircuit(result, s.theta);
+  const c = EDU_CONTENT[state.type];
+  if (c) renderEducation(result, null);
+}
+
+function attachCursorHandlers() {
+  const container = $('waveform-container');
+  container.addEventListener('mousemove', (e) => {
+    if (state.playing || !currentResult) return;
+    const meta = waveformWrapper._meta; if (!meta) return;
+    // getBoundingClientRect() reflects the real, post-page-zoom visual box, so
+    // dividing by it converts the raw mouse position into a 0..1 fraction that
+    // is correct regardless of the current whole-page zoom level.
+    const rect = container.getBoundingClientRect();
+    const frac0 = (e.clientX - rect.left) / rect.width;
+    const xSvg = frac0 * meta.W;
+    const frac = Math.max(0, Math.min(1, (xSvg - meta.padL) / meta.plotW));
+    state.cursorTheta = meta.thetaMin + frac * (meta.thetaMax - meta.thetaMin);
+    updateCursorVisual(currentResult);
+  });
+  container.addEventListener('mouseleave', () => {
+    if (state.playing) return;
+    state.cursorTheta = null;
+    if (currentResult) updateCursorVisual(currentResult);
+  });
+}
+
+// Animation loop
+function animFrame(ts) {
+  if (!state.playing) return;
+  if (state.lastFrameTs == null) state.lastFrameTs = ts;
+  const dtMs = ts - state.lastFrameTs;
+  state.lastFrameTs = ts;
+  const radPerSec = 1.2 * state.speed; // visual speed
+  state.playTheta += radPerSec * (dtMs / 1000);
+  const meta = waveformWrapper._meta;
+  if (meta) {
+    const span = meta.thetaMax - meta.thetaMin;
+    if (state.playTheta > span) state.playTheta -= span;
+  }
+  if (currentResult) updateCursorVisual(currentResult);
+  requestAnimationFrame(animFrame);
+}
+function startAnimation() {
+  if (state.playing) return;
+  state.playing = true;
+  state.lastFrameTs = null;
+  $('btn-play').textContent = '⏸ Pause';
+  updateStatus(currentResult);
+  animationId = requestAnimationFrame(animFrame);
+}
+function stopAnimation() {
+  state.playing = false;
+  if (animationId) {
+    cancelAnimationFrame(animationId);
+    animationId = null;
+  }
+  const btn = $('btn-play');
+  if (btn) btn.textContent = '▶ Play';
+  if (currentResult) updateStatus(currentResult);
+}
+function resetAnimation() {
+  state.playTheta = 0; state.cursorTheta = null;
+  if (currentResult) updateCursorVisual(currentResult);
+}
+
+// ============================================================
+// DUAL CONVERTER (two antiparallel full converters, 4-quadrant)
+// ============================================================
+function renderDualConverter() {
+  pageTitle.textContent = 'Dual Converter — Four-Quadrant Operation';
+  pageSubtitle.textContent = 'Two antiparallel full converters, α₁ + α₂ = π';
+  harmonicsContainer.parentElement.classList.add('hidden');
+  fwdWrap.classList.add('hidden');
+  $('source-panel-wrap').classList.add('hidden');
+
+  const alpha1 = state.params.alpha;
+  const alpha1Rad = alpha1 * Math.PI / 180;
+  const alpha2Rad = Math.PI - alpha1Rad;
+  const Idc = state.params.R; // reuse R slider as "test load current" magnitude for this page
+  const dirPositive = state.dirPositive;
+
+  paramPanel.innerHTML = paramRow('Vrms', 'V<sub>rms</sub>', 50, 400, 5, v => v + ' V') +
+    paramRow('f', 'f', 25, 100, 5, v => v + ' Hz') +
+    `<div class="flex items-center gap-2"><span class="param-label">α₁</span><input type="range" class="param-slider w-24" id="slider-alpha" min="0" max="179" step="1" value="${alpha1}"><span class="param-value" id="val-alpha">${alpha1}°</span></div>` +
+    `<div class="flex items-center gap-2"><span class="param-label">I<sub>dc</sub> test</span><input type="range" class="param-slider w-20" id="slider-R" min="1" max="30" step="0.5" value="${Idc}"><span class="param-value" id="val-R">${Idc} A</span></div>` +
+    `<div class="flex items-center justify-between glass rounded-lg px-3 py-1.5"><span class="text-xs text-slate-300 mr-2">Current direction</span><div class="toggle ${dirPositive ? 'on' : ''}" id="dir-toggle"><div class="dot"></div></div></div>`;
+
+  $('slider-Vrms').oninput = e => { state.params.Vrms = +e.target.value; $('val-Vrms').textContent = e.target.value + ' V'; renderDualConverter(); };
+  $('slider-f').oninput = e => { state.params.f = +e.target.value; $('val-f').textContent = e.target.value + ' Hz'; renderDualConverter(); };
+  $('slider-alpha').oninput = e => { state.params.alpha = +e.target.value; $('val-alpha').textContent = e.target.value + '°'; renderDualConverter(); };
+  $('slider-R').oninput = e => { state.params.R = +e.target.value; $('val-R').textContent = e.target.value + ' A'; renderDualConverter(); };
+  $('dir-toggle').onclick = () => { state.dirPositive = !state.dirPositive; renderDualConverter(); };
+
+  const Vm = state.params.Vrms * Math.SQRT2;
+  const Vdc1 = 2 * Vm / Math.PI * Math.cos(alpha1Rad);
+  const Vdc2 = 2 * Vm / Math.PI * Math.cos(alpha2Rad);
+  const activeConverter = dirPositive ? 'P' : 'N';
+  const V = Vdc1, I = dirPositive ? Idc : -Idc;
+
+  // circuit: two bridges in antiparallel across the same load
+  const W = 620, H = 240;
+  let svg = '';
+  svg += svgACSource(60, 120, 30);
+  svg += svgWire(90, 120, 140, 120, true);
+  svg += `<rect x="140" y="60" width="120" height="70" rx="8" fill="none" stroke="${dirPositive ? '#10b981' : '#334155'}" stroke-width="2"/>`;
+  svg += `<text x="200" y="100" text-anchor="middle" fill="${dirPositive ? '#10b981' : '#64748b'}" font-size="13" font-weight="700">Converter P</text>`;
+  svg += `<text x="200" y="116" text-anchor="middle" fill="#94a3b8" font-size="10" class="mono">α₁=${alpha1.toFixed(0)}°  Vdc1=${Vdc1.toFixed(0)}V</text>`;
+  svg += `<rect x="140" y="140" width="120" height="70" rx="8" fill="none" stroke="${!dirPositive ? '#f59e0b' : '#334155'}" stroke-width="2"/>`;
+  svg += `<text x="200" y="180" text-anchor="middle" fill="${!dirPositive ? '#f59e0b' : '#64748b'}" font-size="13" font-weight="700">Converter N</text>`;
+  svg += `<text x="200" y="196" text-anchor="middle" fill="#94a3b8" font-size="10" class="mono">α₂=${(alpha2Rad * 180 / Math.PI).toFixed(0)}°  Vdc2=${Vdc2.toFixed(0)}V</text>`;
+  svg += svgWire(260, 95, 340, 95, dirPositive);
+  svg += svgWire(260, 175, 340, 175, !dirPositive);
+  svg += svgWire(340, 95, 340, 175, true);
+  svg += svgInductor(400, 135, 50, true);
+  svg += svgWire(340, 135, 375, 135, true);
+  svg += svgWire(425, 135, 460, 135, true);
+  svg += `<text x="460" y="120" fill="#94a3b8" font-size="10">Load (motor / battery)</text>`;
+  svg += svgWire(60, 150, 60, 210, true);
+  svg += svgWire(60, 210, 460, 210, true);
+  svg += svgWire(460, 135, 460, 210, true);
+  circuitContainer.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="w-full max-w-[640px] h-auto">${svg}</svg>`;
+  circuitStateLabel.textContent = `● ${activeConverter === 'P' ? 'Converter P active' : 'Converter N active'}`;
+  circuitStateLabel.className = 'normal-case ml-2 ' + (activeConverter === 'P' ? 'text-emerald-400' : 'text-amber-400');
+  alphaBetaReadout.textContent = `α₁=${alpha1}°  α₂=${(alpha2Rad * 180 / Math.PI).toFixed(0)}°  Vdc1=-Vdc2 check: ${(Vdc1 + Vdc2).toFixed(2)}V≈0`;
+
+  // four-quadrant diagram
+  const qW = 900, qH = 340, cx0 = qW / 2, cy0 = qH / 2, R = 130;
+  const Vnorm = Math.max(-1, Math.min(1, V / (2 * Vm / Math.PI)));
+  const Inorm = Math.max(-1, Math.min(1, I / 30));
+  const px = cx0 + Vnorm * R, py = cy0 - Inorm * R;
+  let qsvg = `<svg viewBox="0 0 ${qW} ${qH}" class="w-full h-auto">`;
+  qsvg += `<line x1="${cx0 - R - 20}" y1="${cy0}" x2="${cx0 + R + 20}" y2="${cy0}" stroke="#475569" stroke-width="1.5"/>`;
+  qsvg += `<line x1="${cx0}" y1="${cy0 - R - 20}" x2="${cx0}" y2="${cy0 + R + 20}" stroke="#475569" stroke-width="1.5"/>`;
+  qsvg += `<text x="${cx0 + R + 26}" y="${cy0 + 4}" fill="#64748b" font-size="11">+V</text>`;
+  qsvg += `<text x="${cx0 - R - 40}" y="${cy0 + 4}" fill="#64748b" font-size="11">−V</text>`;
+  qsvg += `<text x="${cx0 + 6}" y="${cy0 - R - 26}" fill="#64748b" font-size="11">+I</text>`;
+  qsvg += `<text x="${cx0 + 6}" y="${cy0 + R + 34}" fill="#64748b" font-size="11">−I</text>`;
+  const qLabels = [['Motoring\n(P fwd)', cx0 + R / 2, cy0 - R / 2], ['Regen brake\n(N fwd)', cx0 - R / 2, cy0 - R / 2],
+  ['Motoring rev\n(N fwd)', cx0 - R / 2, cy0 + R / 2], ['Regen brake\n(P fwd)', cx0 + R / 2, cy0 + R / 2]];
+  qLabels.forEach(([t, x, y]) => { t.split('\n').forEach((line, i) => qsvg += `<text x="${x}" y="${y + i * 12}" text-anchor="middle" fill="#3f3f46" font-size="10">${line}</text>`); });
+  qsvg += `<circle cx="${px}" cy="${py}" r="8" fill="#8b5cf6" stroke="#fff" stroke-width="2"/>`;
+  qsvg += `<text x="${px}" y="${py - 16}" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">(${V.toFixed(0)}V, ${I.toFixed(1)}A)</text>`;
+  qsvg += '</svg>';
+  waveformWrapper.innerHTML = qsvg;
+  waveformWrapper._meta = null;
+  cursorLine.style.display = 'none'; cursorReadout.style.display = 'none';
+
+  timelineContainer.innerHTML = `<div class="text-xs text-slate-400">Only <b>one</b> converter conducts at a time — the other is blocked by a circulating-current-free logic control (α₁+α₂=π keeps their average voltages equal and opposite so no net circulating current flows between them).</div>`;
+
+  metricsGrid.innerHTML = metricCard('V<sub>dc1</sub> (P)', Vdc1.toFixed(1) + ' V') + metricCard('V<sub>dc2</sub> (N)', Vdc2.toFixed(1) + ' V') +
+    metricCard('α₁', alpha1.toFixed(0) + '°') + metricCard('α₂', (alpha2Rad * 180 / Math.PI).toFixed(0) + '°') +
+    metricCard('Active', activeConverter) + metricCard('Operating pt.', `${V.toFixed(0)}V, ${I.toFixed(1)}A`);
+  errorReadout.textContent = '';
+
+  eduPanel.innerHTML = `
+    <div><b class="text-slate-100">What happens?</b> Two full converters are connected antiparallel across the same load. Converter P handles positive load current (motoring), converter N handles negative load current (reverse / regenerative), so together the pair gives four-quadrant control of voltage AND current direction.</div>
+    <div><b class="text-slate-100">Why?</b> A single converter can only pass current one way through its SCRs. To reverse current direction, you need a second bridge wired backwards. Setting α₂=π−α₁ keeps the two bridges' average voltages equal and opposite, preventing a large AC circulating current between them.</div>
+    <div><b class="text-slate-100">Key equation:</b> <span class="mono text-cyan-300">α₁ + α₂ = π, &nbsp; V<sub>dc1</sub> = &minus;V<sub>dc2</sub></span></div>
+    <div><b class="text-slate-100">Observe:</b><ul class="list-disc pl-5">
+      <li>Sweep α₁ from 0°→180° and watch the operating point sweep through all four quadrants.</li>
+      <li>Toggle current direction to switch which converter (P or N) is actively conducting.</li>
+      <li>At α₁=90°, both converters produce Vdc≈0 — the natural transition point.</li>
+    </ul></div>`;
+  updateStatus({ mode: 'CCM', metrics: { Vdc: Vdc1 } });
+}
+
+// ============================================================
+// DC MOTOR DRIVE (RK4 armature + mechanical, 4 operating modes)
+// ============================================================
+const MOTOR_DEFAULTS = { Vrms: 230, f: 50, alpha: 30, Ra: 2, La: 0.02, Ke: 1.2, Kt: 1.2, J: 0.05, B: 0.01, TL: 5, Rb: 8 };
+let motorParams = Object.assign({}, MOTOR_DEFAULTS);
+
+function motorRow(key, label, min, max, step, unit) {
+  const v = motorParams[key];
+  return `<div class="flex items-center gap-2"><span class="param-label">${label}</span>
+    <input type="range" class="param-slider w-16" id="mslider-${key}" min="${min}" max="${max}" step="${step}" value="${v}">
+    <span class="param-value" id="mval-${key}">${v}${unit}</span></div>`;
+}
+
+function renderMotorDrive() {
+  pageTitle.textContent = 'DC Motor Drive';
+  pageSubtitle.textContent = { motoring: 'Motoring', regenerative: 'Regenerative Braking', 'dynamic-braking': 'Dynamic Braking', plugging: 'Plugging' }[state.load];
+  harmonicsContainer.parentElement.classList.add('hidden');
+  fwdWrap.classList.add('hidden');
+  $('source-panel-wrap').classList.add('hidden');
+
+  paramPanel.innerHTML =
+    motorRow('alpha', 'α', 0, 179, 1, '°') + motorRow('Ra', 'R<sub>a</sub>', 0.5, 10, 0.5, 'Ω') +
+    motorRow('La', 'L<sub>a</sub>', 0.005, 0.2, 0.005, 'H') + motorRow('Ke', 'K<sub>e</sub>', 0.3, 3, 0.1, '') +
+    motorRow('Kt', 'K<sub>t</sub>', 0.3, 3, 0.1, '') + motorRow('J', 'J', 0.01, 0.3, 0.01, '') +
+    motorRow('TL', 'T<sub>L</sub>', 0, 20, 1, '') + (state.load === 'dynamic-braking' ? motorRow('Rb', 'R<sub>b</sub>', 1, 30, 1, 'Ω') : '');
+
+  ['alpha', 'Ra', 'La', 'Ke', 'Kt', 'J', 'TL', 'Rb'].forEach(key => {
+    const el = $('mslider-' + key);
+    if (!el) return;
+    el.oninput = () => { motorParams[key] = parseFloat(el.value); $('mval-' + key).textContent = el.value + (key === 'alpha' ? '°' : ''); renderMotorDrive(); };
+  });
+
+  const Vrms = state.params.Vrms, f = state.params.f, omega = 2 * Math.PI * f;
+  let alphaEff = motorParams.alpha, sign = 1;
+  if (state.load === 'dynamic-braking') { alphaEff = 90; } // supply disconnected -> Va forced 0 avg via alpha~90 trick not exact; handled specially below
+  if (state.load === 'plugging') sign = -1; // reversed armature terminals
+
+  // Get instantaneous rectifier output (reuse full-bridge-controlled engine) as Va ripple source
+  const rectParams = { Vrms, f, R: 0.001, L: 0.001, E: 0, alpha: alphaEff };
+  const rect = simulateConverter('full-wave-controlled-bridge', 'RL', rectParams);
+  const theta = rect.theta;
+  const N = theta.length;
+  const dtheta = theta[1] - theta[0];
+
+  // RK4 coupled: Ia, omega_m over one displayed cycle, using rect.vo as Va(theta) [already real device output]
+  const Ia = new Float64Array(N), Wm = new Float64Array(N), Eg = new Float64Array(N), Te = new Float64Array(N), Va = new Float64Array(N);
+  let ia = motorParams.TL / motorParams.Kt, wm = motorParams.Ke > 0 ? 150 : 100; // rough steady guesses to reduce transient
+  const Ra = motorParams.Ra, La = Math.max(motorParams.La, 1e-4), Ke = motorParams.Ke, Kt = motorParams.Kt, J = motorParams.J, B = motorParams.B, TL = motorParams.TL;
+
+  function derivs(ia, wm, va) {
+    const eg = Ke * wm;
+    const dia = (va - ia * Ra - eg) / La / omega;
+    const te = Kt * ia;
+    const dwm = (te - TL - B * wm) / J / omega;
+    return { dia, dwm, eg, te };
+  }
+
+  // settle for a couple of pre-cycles for quasi-steady state (cheap, reuse theta grid conceptually)
+  for (let pass = 0; pass < 3; pass++) {
+    for (let k = 0; k < N; k++) {
+      let vaVal;
+      if (state.load === 'dynamic-braking') vaVal = 0; // supply disconnected, armature shorted through Rb
+      else vaVal = sign * rect.vo[k];
+      const RaEff = state.load === 'dynamic-braking' ? Ra + motorParams.Rb : Ra;
+      const k1 = derivs(ia, wm, vaVal); k1.dia = (vaVal - ia * RaEff - k1.eg) / La / omega;
+      const k2v = derivs(ia + 0.5 * dtheta * k1.dia, wm + 0.5 * dtheta * k1.dwm, vaVal); k2v.dia = (vaVal - (ia + 0.5 * dtheta * k1.dia) * RaEff - k2v.eg) / La / omega;
+      const k3v = derivs(ia + 0.5 * dtheta * k2v.dia, wm + 0.5 * dtheta * k2v.dwm, vaVal); k3v.dia = (vaVal - (ia + 0.5 * dtheta * k2v.dia) * RaEff - k3v.eg) / La / omega;
+      const k4v = derivs(ia + dtheta * k3v.dia, wm + dtheta * k3v.dwm, vaVal); k4v.dia = (vaVal - (ia + dtheta * k3v.dia) * RaEff - k4v.eg) / La / omega;
+      ia = ia + (dtheta / 6) * (k1.dia + 2 * k2v.dia + 2 * k3v.dia + k4v.dia);
+      wm = wm + (dtheta / 6) * (k1.dwm + 2 * k2v.dwm + 2 * k3v.dwm + k4v.dwm);
+      if (pass === 2) { Ia[k] = ia; Wm[k] = wm; Eg[k] = Ke * wm; Te[k] = Kt * ia; Va[k] = vaVal; }
+    }
+  }
+
+  // waveform plot (custom, reusing SVG plot style)
+  const W = 900, H = 320, padL = 46, padR = 20, padT = 14, padB = 30, plotW = W - padL - padR, plotH = H - padT - padB;
+  const thetaMin = theta[0], thetaMax = theta[N - 1];
+  const xScale = th => padL + (th - thetaMin) / (thetaMax - thetaMin) * plotW;
+  let vMax = 1, iMax = 1;
+  for (let k = 0; k < N; k++) { vMax = Math.max(vMax, Math.abs(Va[k]), Math.abs(Eg[k])); iMax = Math.max(iMax, Math.abs(Ia[k])); }
+  vMax *= 1.2; iMax *= 1.3;
+  const yMid = padT + plotH / 2;
+  const yV = v => yMid - (v / vMax) * (plotH / 2);
+  const yI = v => yMid - (v / iMax) * (plotH / 2);
+  function path(arr, ys) { let d = ''; for (let k = 0; k < N; k++) d += (k === 0 ? 'M' : 'L') + xScale(theta[k]).toFixed(1) + ' ' + ys(arr[k]).toFixed(1) + ' '; return d; }
+  let svg = `<svg viewBox="0 0 ${W} ${H}">`;
+  svg += `<line x1="${padL}" y1="${yMid}" x2="${padL + plotW}" y2="${yMid}" stroke="rgba(255,255,255,.12)"/>`;
+  svg += `<path d="${path(Va, yV)}" stroke="#38bdf8" fill="none" stroke-width="1.6"/>`;
+  svg += `<path d="${path(Eg, yV)}" stroke="#34d399" fill="none" stroke-width="1.6"/>`;
+  svg += `<path d="${path(Ia, yI)}" stroke="#fbbf24" fill="none" stroke-width="1.8"/>`;
+  svg += `<text x="${padL}" y="12" fill="#38bdf8" font-size="10">Va</text><text x="${padL + 30}" y="12" fill="#34d399" font-size="10">Eg</text><text x="${padL + 58}" y="12" fill="#fbbf24" font-size="10">Ia</text>`;
+  svg += '</svg>';
+  waveformWrapper.innerHTML = svg; waveformWrapper._meta = null;
+  cursorLine.style.display = 'none'; cursorReadout.style.display = 'none';
+
+  const IaAvg = Ia.reduce((a, b) => a + b, 0) / N, WmAvg = Wm.reduce((a, b) => a + b, 0) / N;
+  const EgAvg = Ke * WmAvg, VaAvg = Va.reduce((a, b) => a + b, 0) / N;
+  const Pmech = Kt * IaAvg * WmAvg, Pelec = VaAvg * IaAvg;
+
+  // circuit
+  const powerToSource = Pelec < 0;
+  let csvg = '';
+  csvg += svgACSource(60, 130, 30);
+  csvg += svgWire(90, 130, 150, 130, true);
+  csvg += (state.load === 'dynamic-braking'
+    ? `<text x="200" y="110" text-anchor="middle" fill="#f59e0b" font-size="11">Supply disconnected</text>`
+    : `<rect x="150" y="90" width="110" height="80" rx="8" fill="none" stroke="#8b5cf6" stroke-width="2"/><text x="205" y="134" text-anchor="middle" fill="#8b5cf6" font-size="12" font-weight="700">Controlled Bridge</text><text x="205" y="150" text-anchor="middle" fill="#94a3b8" font-size="10" class="mono">α=${motorParams.alpha}°</text>`);
+  csvg += svgWire(260, 130, 320, 130, true);
+  if (state.load === 'dynamic-braking') { csvg += svgResistor(300, 200, 50, true); csvg += svgWire(320, 130, 320, 175, true); csvg += svgWire(320, 225, 320, 260, true); }
+  csvg += `<circle cx="380" cy="130" r="40" fill="none" stroke="${powerToSource ? '#f87171' : '#10b981'}" stroke-width="2.5" class="device-on" style="color:${powerToSource ? '#f87171' : '#10b981'}"/>`;
+  csvg += `<text x="380" y="126" text-anchor="middle" fill="${powerToSource ? '#f87171' : '#10b981'}" font-size="13" font-weight="700">M</text>`;
+  csvg += `<text x="380" y="142" text-anchor="middle" fill="#94a3b8" font-size="9">ω=${WmAvg.toFixed(0)} rad/s</text>`;
+  csvg += svgWire(320, 130, 340, 130, true);
+  csvg += svgWire(60, 160, 60, 260, true); csvg += svgWire(60, 260, 380, 260, true); csvg += svgWire(380, 170, 380, 260, true);
+  const arrowX = powerToSource ? [420, 320] : [320, 420];
+  csvg += `<line x1="${arrowX[0]}" y1="90" x2="${arrowX[1]}" y2="90" stroke="${powerToSource ? '#f87171' : '#10b981'}" stroke-width="2" marker-end="url(#arrow)"/>`;
+  csvg += `<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="${powerToSource ? '#f87171' : '#10b981'}"/></marker></defs>`;
+  csvg += `<text x="370" y="80" text-anchor="middle" fill="${powerToSource ? '#f87171' : '#10b981'}" font-size="10">${powerToSource ? '← power to source (regen)' : 'power to motor →'}</text>`;
+  circuitContainer.innerHTML = `<svg viewBox="0 0 620 280" class="w-full max-w-[640px] h-auto">${csvg}</svg>`;
+  circuitStateLabel.textContent = powerToSource ? '● regenerating' : '● motoring';
+  circuitStateLabel.className = 'normal-case ml-2 ' + (powerToSource ? 'text-red-400' : 'text-emerald-400');
+  alphaBetaReadout.textContent = `Ia=${IaAvg.toFixed(2)}A  ω=${WmAvg.toFixed(1)} rad/s  Eg=${EgAvg.toFixed(1)}V`;
+
+  timelineContainer.innerHTML = `<div class="text-xs text-slate-400">Armature current ripple follows the rectifier's instantaneous output (see waveform above) — smoother with larger L<sub>a</sub>.</div>`;
+
+  metricsGrid.innerHTML = metricCard('I<sub>a</sub> avg', IaAvg.toFixed(2) + ' A') + metricCard('ω (speed)', WmAvg.toFixed(1) + ' rad/s') +
+    metricCard('E<sub>g</sub>', EgAvg.toFixed(1) + ' V') + metricCard('T<sub>e</sub>', (Kt * IaAvg).toFixed(2) + ' N·m') +
+    metricCard('V<sub>a</sub> avg', VaAvg.toFixed(1) + ' V') + metricCard('P<sub>elec</sub>', Pelec.toFixed(0) + ' W', powerToSource ? 'flowing to source' : 'flowing to motor');
+  errorReadout.textContent = '';
+
+  const modeText = {
+    motoring: { what: 'The converter delivers positive average voltage Va > Eg, driving positive armature current that produces motoring torque.', why: 'Standard operation: α is kept small so Va is large enough to exceed the back-EMF and push current into the motor.', obs: ['Lower α → higher Va → higher steady speed.', 'Larger TL needs larger Ia (and hence lower speed at fixed Va) to balance torque.'] },
+    regenerative: { what: 'α is pushed past 90°, driving the average converter voltage negative while the motor (spinning the same direction) still generates Eg > 0.', why: 'With Eg exceeding the (now negative or reduced) Va, current reverses and flows from the motor back into the source — the converter is now operating as a line-commutated inverter, and mechanical energy is converted back to electrical energy.', obs: ['Watch the power-flow arrow reverse.', 'This simplified single-converter model allows bipolar Ia for illustration; a real system needs the second bridge of a dual converter (see Dual Converter page) since SCRs cannot carry reverse current.'] },
+    'dynamic-braking': { what: 'The supply is disconnected and a braking resistor Rb is switched across the armature.', why: 'The spinning motor\'s own back-EMF now drives current through Ra+Rb, dissipating the kinetic energy as heat in the resistor instead of returning it to the source.', obs: ['Increase Rb to slow the braking (less current, more time) or decrease it for faster, more aggressive braking.', 'No power returns to the AC source — compare this to regenerative braking.'] },
+    plugging: { what: 'The armature terminals are reversed while the motor is still spinning forward, so the applied voltage now opposes the back-EMF instead of driving it.', why: 'Va and Eg add together instead of opposing, producing a very large reverse-current and strong braking torque — this stops the motor extremely quickly, but at the cost of high current stress.', obs: ['⚠ Practical drives insert current-limiting resistance during plugging — without it, armature current can be many times rated current.', 'Once speed crosses zero the motor would start accelerating in reverse unless disconnected.'] },
+  }[state.load];
+  eduPanel.innerHTML = `
+    <div><b class="text-slate-100">What happens?</b> ${modeText.what}</div>
+    <div><b class="text-slate-100">Why?</b> ${modeText.why}</div>
+    <div><b class="text-slate-100">Key equations:</b> <span class="mono text-cyan-300">V_a = E_g + I_aR_a + L_a dI_a/dt,  E_g=K_eω,  T_e=K_tI_a,  J dω/dt = T_e - T_L - Bω</span></div>
+    <div><b class="text-slate-100">Observe:</b><ul class="list-disc pl-5">${modeText.obs.map(o => `<li>${o}</li>`).join('')}</ul></div>`;
+  updateStatus({ mode: 'CCM', metrics: { Vdc: VaAvg } });
+}
+
+// ============================================================
+// EVENT WIRING & INIT
+// ============================================================
+function wireGlobalEvents() {
+  fwdToggle.addEventListener('click', () => { state.hasFWD = !state.hasFWD; render(); });
+  document.addEventListener('change', (e) => { if (e.target.classList.contains('signal-toggle')) { if (currentResult) { renderWaveforms(currentResult); updateZoomSizer(); } } });
+  $('btn-play').addEventListener('click', () => { state.playing ? stopAnimation() : startAnimation(); });
+  $('btn-reset').addEventListener('click', () => { stopAnimation(); resetAnimation(); });
+  $('speed-select').addEventListener('change', (e) => { state.speed = parseFloat(e.target.value); });
+  window.addEventListener('resize', () => { updateZoomSizer(); if (currentResult && waveformWrapper._meta) updateCursorVisual(currentResult); });
+
+  modeBadge.addEventListener('click', () => {
+    const seq = { auto: 'CCM', CCM: 'DCM', DCM: 'auto' };
+    state.modeOverride = seq[state.modeOverride] || 'auto';
+    if (currentResult) { updateStatus(currentResult); renderMetrics(currentResult); }
+  });
+
+  $('btn-zoom-in').addEventListener('click', () => { setZoom(state.zoom * 1.15); });
+  $('btn-zoom-out').addEventListener('click', () => { setZoom(state.zoom / 1.15); });
+  $('zoom-label').addEventListener('click', () => { setZoom(1); });
+  // Ctrl/Cmd + scroll wheel zooms the whole page, like a real app.
+  $('zoom-viewport').addEventListener('wheel', (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    e.preventDefault();
+    setZoom(state.zoom * (e.deltaY < 0 ? 1.08 : 1 / 1.08));
+  }, { passive: false });
+  $('btn-export-png').addEventListener('click', exportWaveformsPNG);
+}
+
+// ============================================================
+// WHOLE-PAGE ZOOM
+// Everything — sidebar options, circuit schematic, gate pulses, all
+// waveform panels — lives inside #zoom-stage, which gets a single
+// transform:scale(). #zoom-sizer is kept sized to the stage's *scaled*
+// footprint so the outer #zoom-viewport's native scrollbars always match
+// what's actually on screen (nothing gets clipped or misaligned).
+// ============================================================
+function setZoom(z) {
+  state.zoom = Math.max(0.5, Math.min(2.5, z));
+  const stage = $('zoom-stage');
+  stage.style.transform = 'scale(' + state.zoom + ')';
+  $('zoom-label').textContent = Math.round(state.zoom * 100) + '%';
+  updateZoomSizer();
+}
+
+function updateZoomSizer() {
+  const stage = $('zoom-stage');
+  const sizer = $('zoom-sizer');
+  if (!stage || !sizer) return;
+  // offsetWidth/Height reflect the stage's natural, PRE-transform layout box,
+  // so multiplying by zoom gives exactly the visual footprint after scaling.
+  sizer.style.width = (stage.offsetWidth * state.zoom) + 'px';
+  sizer.style.height = (stage.offsetHeight * state.zoom) + 'px';
+}
+
+// Composite every currently visible chart panel — 3-phase source panel (if
+// shown) AND the main waveform stack (incl. gate pulses) — into one single
+// tall PNG with each panel's title baked in, and download it.
+function exportWaveformsPNG() {
+  try {
+    const panels = [];
+    document.querySelectorAll('#source-panel-wrap .chart-panel, #waveform-svg-wrapper .chart-panel').forEach(panelEl => {
+      const svg = panelEl.querySelector('svg');
+      const titleEl = panelEl.querySelector('.chart-panel-title');
+      if (svg) panels.push({ svg, title: titleEl ? titleEl.textContent : '' });
+    });
+    if (!panels.length) return;
+
+    const scaleFactor = 2; // export at 2x for crispness
+    const panelW = 900;
+    const titleH = 26;
+    const gap = 14;
+    let totalH = 0;
+    const heights = panels.map(p => {
+      const vb = p.svg.getAttribute('viewBox').split(' ').map(Number);
+      totalH += titleH + vb[3] + gap;
+      return vb[3];
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = panelW * scaleFactor;
+    canvas.height = totalH * scaleFactor;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#0a0a12';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.scale(scaleFactor, scaleFactor);
+
+    let loaded = 0, yOffset = 0;
+    const offsets = [];
+    panels.forEach((p, i) => { offsets.push(yOffset); yOffset += titleH + heights[i] + gap; });
+
+    const finish = () => {
+      canvas.toBlob(blob => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'acdc-waveforms-' + state.type + '-' + state.load + '.png';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      });
+    };
+
+    panels.forEach((p, i) => {
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '700 11px JetBrains Mono, monospace';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText(p.title.toUpperCase(), 4, offsets[i] + titleH - 8);
+
+      const xml = new XMLSerializer().serializeToString(p.svg);
+      const svgBlob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, offsets[i] + titleH, panelW, heights[i]);
+        URL.revokeObjectURL(url);
+        loaded++;
+        if (loaded === panels.length) finish();
+      };
+      img.onerror = () => { loaded++; if (loaded === panels.length) finish(); };
+      img.src = url;
+    });
+  } catch (e) {
+    console.error('PNG export failed', e);
+  }
+}
+
+function checkMobileWarning() {
+  const el = $('mobile-warning');
+  if (!el) return;
+  const isNarrow = window.innerWidth < 760;
+  const isMobileUA = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
+  if ((isNarrow || isMobileUA) && !sessionStorage.getItem('acdc-mobile-warning-dismissed')) {
+    el.classList.remove('hidden');
+  }
+}
+
+function init() {
+  bindDom();
+  attachCursorHandlers();
+  wireGlobalEvents();
+  const dismissBtn = $('mobile-warning-dismiss');
+  if (dismissBtn) dismissBtn.addEventListener('click', () => {
+    $('mobile-warning').classList.add('hidden');
+    try { sessionStorage.setItem('acdc-mobile-warning-dismissed', '1'); } catch (e) {}
+  });
+  checkMobileWarning();
+  render();
+  updateZoomSizer();
+  // Content height changes on every param tweak / converter switch — keep the
+  // scroll area's reserved size in sync automatically instead of only on zoom.
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => updateZoomSizer()).observe($('zoom-stage'));
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+
+</script>
+</body>
+</html>
