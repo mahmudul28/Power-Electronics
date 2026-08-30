@@ -137,6 +137,11 @@ body {
         <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="signal-toggle" data-signal="is"> i<sub>s</sub></label>
         <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="signal-toggle" data-signal="vT"> v<sub>T</sub></label>
         <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="signal-toggle" data-signal="ig"> gate</label>
+        <div id="gate-span-wrap" class="hidden items-center gap-1.5" style="display:none;">
+          <span class="text-[10px] text-slate-500 uppercase tracking-wide">Pulse width</span>
+          <input type="range" class="param-slider w-16" id="slider-gate-span" min="1" max="60" step="1" value="8">
+          <span class="param-value mono" id="val-gate-span">8°</span>
+        </div>
         <div class="ml-auto flex items-center gap-2">
           <button class="icon-btn" id="btn-export-png" title="Download every waveform panel (incl. source & gate) as one PNG">⬇ PNG</button>
           <button class="icon-btn" id="btn-reset">⟲ Reset</button>
@@ -328,7 +333,11 @@ function buildTopology(type, load, params) {
       const bot = selectPole(th, a, [va, vb, vc], 'min');
       return { value: top.value - bot.value, index: top.index, topIndex: top.index, bottomIndex: bot.index };
     };
-    const topLbl = { 0: 'T1', 1: 'T3', 2: 'T5' }, botLbl = { 0: 'T6', 1: 'T2', 2: 'T4' };
+    // BUGFIX: labels were hard-coded to T1..T6 even for the uncontrolled
+    // (diode) bridge — 'T' conventionally means thyristor/SCR, so the diode
+    // version must read D1..D6 instead.
+    const dev = isControlled ? 'T' : 'D';
+    const topLbl = { 0: dev + '1', 1: dev + '3', 2: dev + '5' }, botLbl = { 0: dev + '6', 1: dev + '2', 2: dev + '4' };
     return { selectFn, hasFWD: false, nPoles: 6, isControlled, isBridge6: true, topLbl, botLbl,
       threePhase: true, phases: { va, vb, vc }, vsDisplay: va, alphaUsed: a, firingPeriod: Math.PI / 3 };
   }
@@ -487,6 +496,7 @@ const state = {
   lastFrameTs: null,
   modeOverride: 'auto', // 'auto' | 'CCM' | 'DCM' — user can force either label to compare
   zoom: 1,
+  gatePulseSpanDeg: 8, // angular width drawn for each firing pulse (was a single infinitely-thin line)
 };
 let animationId = null;
 const CATEGORIES = [
@@ -641,19 +651,33 @@ function renderNav() {
   loadContainer.innerHTML = loads.map(l =>
     `<div class="sub-nav-btn ${state.load === l ? 'active' : ''}" data-load="${l}">${l}</div>`).join('');
   loadContainer.querySelectorAll('.sub-nav-btn').forEach(btn => {
-    btn.onclick = () => { state.load = btn.dataset.load; stopAnimation(); render(); };
+    btn.onclick = () => {
+      state.load = btn.dataset.load;
+      // BUGFIX: an RLE load with E left at 0 is numerically IDENTICAL to a
+      // plain RL load (the back-EMF term simply vanishes), so switching
+      // R/L/RL -> RLE looked like "nothing changed". Give E a sensible,
+      // clearly non-zero default the first time a load containing 'E' is
+      // selected, so the effect of the back-EMF is immediately visible.
+      if (state.load.indexOf('E') !== -1 && state.params.E === 0) {
+        state.params.E = Math.round(state.params.Vrms * Math.SQRT2 * 0.2 / 5) * 5;
+      }
+      stopAnimation();
+      render();
+    };
   });
 }
 
 // ============================================================
 // PARAM PANEL (dynamic sliders)
 // ============================================================
-function paramRow(key, label, min, max, step, fmt) {
+function paramRow(key, label, min, max, step, fmt, opts) {
   const v = state.params[key];
+  const withInput = opts && opts.numberInput;
   return `<div class="flex items-center gap-2" data-param-row="${key}">
     <span class="param-label">${label}</span>
     <input type="range" class="param-slider w-20" id="slider-${key}" min="${min}" max="${max}" step="${step}" value="${v}">
     <span class="param-value" id="val-${key}">${fmt(v)}</span>
+    ${withInput ? `<input type="number" class="mono text-xs bg-black/30 border border-white/20 rounded px-1.5 py-0.5 w-14 text-slate-100 focus:outline-none focus:border-violet-400" id="input-${key}" min="${min}" max="${max}" step="${step}" value="${v}" title="Type an exact ${label.replace(/<[^>]+>/g,'')} value, then press Enter">` : ''}
   </div>`;
 }
 
@@ -667,8 +691,10 @@ function renderParamPanel() {
   html += paramRow('R', 'R', 1, 50, 0.5, v => v + ' Ω');
   if (hasL) html += paramRow('L', 'L', 0.001, 1, 0.001, v => (v * 1000).toFixed(0) + ' mH');
   if (hasE) html += paramRow('E', 'E', 0, 300, 5, v => v + ' V');
-  if (isControlled) html += paramRow('alpha', 'α', 0, 179, 1, v => v + '°');
+  if (isControlled) html += paramRow('alpha', 'α', 0, 179, 1, v => v + '°', { numberInput: true });
   paramPanel.innerHTML = html;
+
+  const fmtMap = { Vrms: v => v + ' V', f: v => v + ' Hz', R: v => v + ' Ω', L: v => (v * 1000).toFixed(0) + ' mH', E: v => v + ' V', alpha: v => v + '°' };
 
   Object.keys(state.params).forEach(key => {
     const el = $('slider-' + key);
@@ -676,11 +702,32 @@ function renderParamPanel() {
     el.addEventListener('input', () => {
       let val = parseFloat(el.value);
       state.params[key] = val;
-      $('val-' + key).textContent = { Vrms: v => v + ' V', f: v => v + ' Hz', R: v => v + ' Ω', L: v => (v * 1000).toFixed(0) + ' mH', E: v => v + ' V', alpha: v => v + '°' }[key](val);
+      $('val-' + key).textContent = fmtMap[key](val);
+      const numEl = $('input-' + key);
+      if (numEl) numEl.value = val; // keep the typed-value box in sync while dragging
       stopAnimation();
       renderStandardConverter();
     });
   });
+
+  // Efficient direct-entry box for the firing angle: type an exact value and
+  // press Enter/Tab (fires on 'change', not every keystroke, so re-rendering
+  // mid-typing never steals focus back from you).
+  const alphaInput = $('input-alpha');
+  if (alphaInput) {
+    alphaInput.addEventListener('change', () => {
+      let val = parseFloat(alphaInput.value);
+      if (isNaN(val)) val = state.params.alpha;
+      val = Math.max(0, Math.min(179, val));
+      alphaInput.value = val;
+      state.params.alpha = val;
+      const slider = $('slider-alpha'); if (slider) slider.value = val;
+      const valSpan = $('val-alpha'); if (valSpan) valSpan.textContent = val + '°';
+      stopAnimation();
+      renderStandardConverter();
+    });
+    alphaInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') alphaInput.blur(); });
+  }
 
   // alpha presets
   const presets = ALPHA_PRESETS[state.type] && ALPHA_PRESETS[state.type][state.load];
@@ -1096,6 +1143,63 @@ function buildChartSVG(theta, series, opts) {
   return { svg, meta: { thetaMin, thetaMax, padL, plotW, W, H } };
 }
 
+// Per-device gate/turn-on pulse chart: one labeled row per physical device
+// (T1, T2, ... T6 for a controlled 6-pulse bridge; D1, D2, ... for diodes;
+// a single row for single-pole topologies). Each firing/turn-on instant is
+// drawn as a rectangle `spanDeg` degrees wide (user-adjustable) instead of
+// an infinitely-thin line, which is both easier to see and closer to how a
+// real gate-drive pulse looks. Shares the same x-axis metadata shape as
+// buildChartSVG so the scrub cursor lines up correctly regardless of which
+// panel happens to be last.
+function buildGateTracksSVG(theta, tracks, opts) {
+  const W = 900, padL = 46, padR = 20, padT = 14, padB = 26;
+  const rowH = 30;
+  const H = opts.H || Math.max(70, tracks.length * rowH + padT + padB);
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const thetaMin = theta[0], thetaMax = theta[theta.length - 1];
+  const xScale = th => padL + (th - thetaMin) / (thetaMax - thetaMin) * plotW;
+  const spanRad = (opts.spanDeg != null ? opts.spanDeg : 8) * Math.PI / 180;
+  const n = Math.max(1, tracks.length);
+  const rH = plotH / n;
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">`;
+
+  // solid gridlines at multiples of π (labeled) — same style as buildChartSVG
+  for (let g = Math.ceil(thetaMin / Math.PI) * Math.PI; g <= thetaMax + 1e-6; g += Math.PI) {
+    const x = xScale(g);
+    svg += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${padT + plotH}" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>`;
+    const nQ = Math.round(g / Math.PI * 2);
+    const label = nQ === 0 ? '0' : (nQ % 2 === 0 ? (nQ / 2 === 1 ? 'π' : (nQ / 2) + 'π') : (nQ + 'π/2'));
+    if (opts.showXLabels !== false) svg += `<text x="${x}" y="${H - 6}" text-anchor="middle" fill="#64748b" font-size="10" class="mono">${label}</text>`;
+  }
+  // dotted gridlines at odd multiples of π/2
+  for (let g = Math.ceil((thetaMin - Math.PI / 2) / Math.PI) * Math.PI + Math.PI / 2; g <= thetaMax + 1e-6; g += Math.PI) {
+    if (g < thetaMin) continue;
+    const x = xScale(g);
+    svg += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${padT + plotH}" stroke="rgba(255,255,255,0.10)" stroke-width="1" stroke-dasharray="2,4"/>`;
+  }
+
+  tracks.forEach((tr, ti) => {
+    const rowTop = padT + ti * rH, rowBot = rowTop + rH;
+    if (ti > 0) svg += `<line x1="${padL}" y1="${rowTop.toFixed(1)}" x2="${(padL + plotW).toFixed(1)}" y2="${rowTop.toFixed(1)}" stroke="rgba(255,255,255,0.05)"/>`;
+    const baseY = rowBot - 6;
+    svg += `<line x1="${padL}" y1="${baseY.toFixed(1)}" x2="${(padL + plotW).toFixed(1)}" y2="${baseY.toFixed(1)}" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>`;
+    svg += `<text x="4" y="${(rowTop + rH / 2 + 3.5).toFixed(1)}" fill="${tr.color}" font-size="10.5" font-weight="700" class="mono">${tr.name}</text>`;
+    for (let k = 0; k < theta.length; k++) {
+      if (tr.test(k) && (k === 0 || !tr.test(k - 1))) {
+        const th0 = theta[k];
+        const x0 = xScale(th0);
+        const x1 = xScale(Math.min(thetaMax, th0 + spanRad));
+        const w = Math.max(2.2, x1 - x0);
+        svg += `<rect x="${x0.toFixed(1)}" y="${(rowTop + 4).toFixed(1)}" width="${w.toFixed(1)}" height="${(rH - 12).toFixed(1)}" rx="1.5" fill="${tr.color}" opacity="0.92"/>`;
+      }
+    }
+  });
+
+  svg += '</svg>';
+  return { svg, meta: { thetaMin, thetaMax, padL, plotW, W, H } };
+}
+
 function chartPanelHTML(title, svg) {
   return `<div class="chart-panel"><div class="chart-panel-title">${title}</div>${svg}</div>`;
 }
@@ -1122,8 +1226,12 @@ function renderWaveforms(result) {
     lastMeta = meta;
   });
   if (showGate) {
-    const { svg, meta } = buildChartSVG(theta, [], { H: 90, alphaRad, alphaPeriod, gatePulses: result.ig, fixedMax: 1, showXLabels: true });
-    html += chartPanelHTML('Gate Pulses', svg);
+    const tracks = buildDeviceTracks(result);
+    const title = tracks.length > 1
+      ? `Gate / Turn-on Pulses — ${tracks.map(t => t.name).join(', ')}`
+      : 'Gate / Turn-on Pulses';
+    const { svg, meta } = buildGateTracksSVG(theta, tracks, { spanDeg: state.gatePulseSpanDeg, showXLabels: true });
+    html += chartPanelHTML(title, svg);
     lastMeta = meta;
   }
   if (!html) html = '<div class="text-sm text-slate-500 p-6 text-center">Select at least one signal above to plot.</div>';
@@ -1165,12 +1273,12 @@ function renderThreePhaseSource(result) {
 // ============================================================
 // CONDUCTION TIMELINE
 // ============================================================
-function renderTimeline(result) {
-  const theta = result.theta, branch = result.branch, sel = result.sel;
-  const thetaMin = theta[0], thetaMax = theta[theta.length - 1], span = thetaMax - thetaMin;
-  const topo = result.topo;
-
-  // build device track list
+// Shared device-track builder: one {name, color, test(k)} entry per physical
+// switching device (diode/SCR/FWD). Used by both the conduction timeline and
+// the per-device gate-pulse chart, so every consumer stays consistent about
+// which device is which color/name (T1, T2, ... for controlled 6-pulse etc).
+function buildDeviceTracks(result) {
+  const branch = result.branch, sel = result.sel, topo = result.topo;
   const tracks = [];
   if (topo.nPoles === 1) {
     tracks.push({ name: topo.poleLabels[0], color: '#f59e0b', test: k => branch[k] === 'MAIN' });
@@ -1187,6 +1295,13 @@ function renderTimeline(result) {
     for (let idx = 0; idx < 3; idx++) tracks.push({ name: topo.topLbl[idx], color: colors[idx], test: k => branch[k] === 'MAIN' && sel[k].topIndex === idx });
     for (let idx = 0; idx < 3; idx++) tracks.push({ name: topo.botLbl[idx], color: colors[idx + 3], test: k => branch[k] === 'MAIN' && sel[k].bottomIndex === idx });
   }
+  return tracks;
+}
+
+function renderTimeline(result) {
+  const theta = result.theta;
+  const thetaMin = theta[0], thetaMax = theta[theta.length - 1], span = thetaMax - thetaMin;
+  const tracks = buildDeviceTracks(result);
 
   let html = '';
   tracks.forEach(tr => {
@@ -1699,9 +1814,27 @@ function renderMotorDrive() {
 // ============================================================
 // EVENT WIRING & INIT
 // ============================================================
+function updateGateSpanVisibility() {
+  const gateChecked = document.querySelector('.signal-toggle[data-signal="ig"]').checked;
+  const wrap = $('gate-span-wrap');
+  wrap.style.display = gateChecked ? 'flex' : 'none';
+  wrap.classList.toggle('hidden', !gateChecked);
+}
+
 function wireGlobalEvents() {
   fwdToggle.addEventListener('click', () => { state.hasFWD = !state.hasFWD; render(); });
-  document.addEventListener('change', (e) => { if (e.target.classList.contains('signal-toggle')) { if (currentResult) { renderWaveforms(currentResult); updateZoomSizer(); } } });
+  document.addEventListener('change', (e) => {
+    if (e.target.classList.contains('signal-toggle')) {
+      updateGateSpanVisibility();
+      if (currentResult) { renderWaveforms(currentResult); updateZoomSizer(); }
+    }
+  });
+  updateGateSpanVisibility();
+  $('slider-gate-span').addEventListener('input', (e) => {
+    state.gatePulseSpanDeg = parseFloat(e.target.value);
+    $('val-gate-span').textContent = state.gatePulseSpanDeg + '°';
+    if (currentResult) { renderWaveforms(currentResult); updateZoomSizer(); }
+  });
   $('btn-play').addEventListener('click', () => { state.playing ? stopAnimation() : startAnimation(); });
   $('btn-reset').addEventListener('click', () => { stopAnimation(); resetAnimation(); });
   $('speed-select').addEventListener('change', (e) => { state.speed = parseFloat(e.target.value); });
