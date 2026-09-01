@@ -129,13 +129,15 @@ body {
     <div id="source-panel-wrap" class="hidden space-y-4"></div>
 
     <div class="glass rounded-2xl p-4">
-      <div class="flex flex-wrap gap-3 mb-1 items-center">
+      <div class="flex flex-wrap gap-3 mb-1 items-center" id="signals-toolbar">
         <span class="param-label mr-1">Signals:</span>
         <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="signal-toggle" data-signal="vs" checked> v<sub>s</sub></label>
         <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="signal-toggle" data-signal="vo" checked> v<sub>o</sub></label>
         <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="signal-toggle" data-signal="io" checked> i<sub>o</sub></label>
         <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="signal-toggle" data-signal="is"> i<sub>s</sub></label>
         <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="signal-toggle" data-signal="vT"> v<sub>T</sub></label>
+        <label class="flex items-center gap-1 text-sm hidden" id="signal-wrap-iabc"><input type="checkbox" class="signal-toggle" data-signal="iabc"> i<sub>a</sub>,i<sub>b</sub>,i<sub>c</sub></label>
+        <label class="flex items-center gap-1 text-sm hidden" id="signal-wrap-vDabc"><input type="checkbox" class="signal-toggle" data-signal="vDabc"> v<sub>D1</sub>,v<sub>D2</sub>,v<sub>D3</sub></label>
         <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="signal-toggle" data-signal="ig"> gate</label>
         <div id="gate-span-wrap" class="hidden items-center gap-1.5" style="display:none;">
           <span class="text-[10px] text-slate-500 uppercase tracking-wide">Pulse width</span>
@@ -336,8 +338,13 @@ function buildTopology(type, load, params) {
     // BUGFIX: labels were hard-coded to T1..T6 even for the uncontrolled
     // (diode) bridge — 'T' conventionally means thyristor/SCR, so the diode
     // version must read D1..D6 instead.
+    // BUGFIX (req #6): bottom-row labels were assigned in the wrong column
+    // order (6,2,4 under phases a,b,c) — the standard textbook bridge
+    // layout (matching the user's circuit) pairs each phase's own column
+    // top+bottom as a=1/4, b=3/6, c=5/2, so the bottom row reading
+    // left-to-right is 4,6,2, not 6,2,4.
     const dev = isControlled ? 'T' : 'D';
-    const topLbl = { 0: dev + '1', 1: dev + '3', 2: dev + '5' }, botLbl = { 0: dev + '6', 1: dev + '2', 2: dev + '4' };
+    const topLbl = { 0: dev + '1', 1: dev + '3', 2: dev + '5' }, botLbl = { 0: dev + '4', 1: dev + '6', 2: dev + '2' };
     return { selectFn, hasFWD: false, nPoles: 6, isControlled, isBridge6: true, topLbl, botLbl,
       threePhase: true, phases: { va, vb, vc }, vsDisplay: va, alphaUsed: a, firingPeriod: Math.PI / 3 };
   }
@@ -366,6 +373,17 @@ function simulateConverter(type, load, params) {
   const theta = new Float64Array(N), vo = new Float64Array(N), io = new Float64Array(N);
   const is = new Float64Array(N), vT = new Float64Array(N), ig = new Float64Array(N), vsArr = new Float64Array(N);
   const branch = new Array(N), sel = new Array(N), devLabel = new Array(N);
+  // Per-phase source currents (req #5 / #6) — populated for every 3-phase
+  // topology (half-wave AND 6-pulse bridge) so i_a,i_b,i_c can be plotted
+  // together. Per-device blocking voltages (req #5) — only meaningful for
+  // the 3-diode/3-SCR half-wave topology, where each device individually
+  // blocks the difference between its own phase and v_o.
+  const ia = topo.threePhase ? new Float64Array(N) : null;
+  const ib = topo.threePhase ? new Float64Array(N) : null;
+  const ic = topo.threePhase ? new Float64Array(N) : null;
+  const vD1 = (topo.threePhase && !topo.isBridge6) ? new Float64Array(N) : null;
+  const vD2 = (topo.threePhase && !topo.isBridge6) ? new Float64Array(N) : null;
+  const vD3 = (topo.threePhase && !topo.isBridge6) ? new Float64Array(N) : null;
   const thetaOffset = thetaFull[startIdx];
 
   for (let k = 0; k < N; k++) {
@@ -388,10 +406,24 @@ function simulateConverter(type, load, params) {
       devLabel[k] = branch[k] === 'MAIN' ? (topo.topLbl[s.topIndex] + '+' + topo.botLbl[s.bottomIndex]) : 'blocking';
       vT[k] = branch[k] === 'MAIN' ? 0 : (topo.phases.va(th) - vo[k]);
       is[k] = branch[k] === 'MAIN' && sel[k].topIndex === 0 ? io[k] : (branch[k] === 'MAIN' && sel[k].bottomIndex === 0 ? -io[k] : 0);
+      // each phase carries +io while it's the top (source-into-load) device,
+      // -io while it's the bottom (load-into-source) device, else 0.
+      ia[k] = (branch[k] === 'MAIN' && s.topIndex === 0) ? io[k] : ((branch[k] === 'MAIN' && s.bottomIndex === 0) ? -io[k] : 0);
+      ib[k] = (branch[k] === 'MAIN' && s.topIndex === 1) ? io[k] : ((branch[k] === 'MAIN' && s.bottomIndex === 1) ? -io[k] : 0);
+      ic[k] = (branch[k] === 'MAIN' && s.topIndex === 2) ? io[k] : ((branch[k] === 'MAIN' && s.bottomIndex === 2) ? -io[k] : 0);
     } else if (topo.threePhase) {
       devLabel[k] = branch[k] === 'MAIN' ? topo.poleLabels[sel[k].index] : 'blocking';
       vT[k] = branch[k] === 'MAIN' ? 0 : (topo.phases.va(th) - vo[k]);
       is[k] = branch[k] === 'MAIN' && sel[k].index === 0 ? io[k] : 0;
+      // each phase's own diode/SCR only ever carries current while it's
+      // the one selected; blocking devices show their reverse-bias voltage.
+      const on0 = branch[k] === 'MAIN' && sel[k].index === 0;
+      const on1 = branch[k] === 'MAIN' && sel[k].index === 1;
+      const on2 = branch[k] === 'MAIN' && sel[k].index === 2;
+      ia[k] = on0 ? io[k] : 0; ib[k] = on1 ? io[k] : 0; ic[k] = on2 ? io[k] : 0;
+      vD1[k] = on0 ? 0 : (topo.phases.va(th) - vo[k]);
+      vD2[k] = on1 ? 0 : (topo.phases.vb(th) - vo[k]);
+      vD3[k] = on2 ? 0 : (topo.phases.vc(th) - vo[k]);
     } else if (topo.nPoles === 2) {
       devLabel[k] = branch[k] === 'MAIN' ? topo.poleLabels[sel[k].index] : (branch[k] === 'FWD' ? topo.fwdLabel : 'blocking');
       vT[k] = branch[k] === 'MAIN' ? 0 : (topo.vsDisplay(th) - vo[k]);
@@ -415,7 +447,7 @@ function simulateConverter(type, load, params) {
 
   const metrics = computeMetrics(theta, vsArr, vo, io, is, omega);
   const mode = detectMode(branch);
-  return { theta, vs: vsArr, vo, io, is, vT, ig, branch, sel, devLabel, topo, omega, Vm: Vrms * Math.SQRT2, metrics, mode, params };
+  return { theta, vs: vsArr, vo, io, is, vT, ig, branch, sel, devLabel, topo, omega, Vm: Vrms * Math.SQRT2, metrics, mode, params, ia, ib, ic, vD1, vD2, vD3 };
 }
 
 function detectMode(branch) {
@@ -576,9 +608,20 @@ let currentResult = null;
 
 function render() {
   renderNav();
-  if (state.category === 'dual-converter') { renderDualConverter(); return; }
-  if (state.category === 'motor-drive') { renderMotorDrive(); return; }
-  renderStandardConverter();
+  // BUGFIX (req #7): the Dual Converter / Motor Drive pages injected their
+  // SVG directly (bypassing renderWaveforms) and never told the whole-page
+  // zoom system its content size had changed, so #zoom-sizer kept
+  // whatever height the PREVIOUS page had — on first navigation to either
+  // page this could leave the new content effectively un-scrollable/
+  // clipped until something else (e.g. toggling a signal checkbox, which
+  // happened to call updateZoomSizer() as a side effect) forced a
+  // recalculation. Every render path now explicitly resyncs the sizer
+  // itself instead of depending on an unrelated control to do it.
+  if (state.category === 'dual-converter') { renderDualConverter(); }
+  else if (state.category === 'motor-drive') { renderMotorDrive(); }
+  else { renderStandardConverter(); }
+  updateZoomSizer();
+  if (window.requestAnimationFrame) requestAnimationFrame(updateZoomSizer);
 }
 
 function effectiveLoad() {
@@ -589,6 +632,7 @@ function effectiveLoad() {
 function renderStandardConverter() {
   pageTitle.textContent = TYPE_LABELS[state.type] || state.type;
   pageSubtitle.textContent = state.load + (FWD_ELIGIBLE[state.type] && state.hasFWD ? ' + FWD' : '');
+  $('signals-toolbar').classList.remove('hidden');
   renderParamPanel();
 
   const p = Object.assign({}, state.params);
@@ -603,6 +647,7 @@ function renderStandardConverter() {
   fwdWrap.classList.toggle('hidden', !(FWD_ELIGIBLE[state.type] && (state.load === 'RL' || state.load === 'RLE')));
   fwdToggle.classList.toggle('on', state.hasFWD);
 
+  updateThreePhaseSignalVisibility(result.topo);
   renderCircuit(result, null);
   renderThreePhaseSource(result);
   renderWaveforms(result);
@@ -658,8 +703,17 @@ function renderNav() {
       // R/L/RL -> RLE looked like "nothing changed". Give E a sensible,
       // clearly non-zero default the first time a load containing 'E' is
       // selected, so the effect of the back-EMF is immediately visible.
+      // BUGFIX (req #3): the old flat "0.2*Vm" default was too low to ever
+      // actually push most converters into DCM (E has to exceed roughly
+      // ~0.7-0.85x the load's own CCM average voltage before current
+      // starts hitting zero), so switching to RLE looked identical between
+      // "CCM" and "DCM" — because it was *always* CCM. Estimate each
+      // topology's own CCM V_dc analytically and default E to 85% of that,
+      // which reliably lands in genuine DCM territory so the discontinuous
+      // dead-band is visible immediately, not just after manually dragging
+      // the E slider.
       if (state.load.indexOf('E') !== -1 && state.params.E === 0) {
-        state.params.E = Math.round(state.params.Vrms * Math.SQRT2 * 0.2 / 5) * 5;
+        state.params.E = estimateDefaultE();
       }
       stopAnimation();
       render();
@@ -737,6 +791,27 @@ function renderParamPanel() {
       b.onclick = () => { state.params.alpha = parseFloat(b.dataset.alpha); stopAnimation(); render(); };
     });
   }
+}
+
+// Rough, formula-based CCM V_dc estimate used ONLY to pick a sensible
+// default E when a load with a back-EMF is first selected (req #3) — not
+// used anywhere in the actual simulation/metrics, which are always fully
+// numeric. Mirrors the closed-form formulas in analyticVdc() but doesn't
+// need a simulated `result` to call it from the load-switch handler.
+function estimateDefaultE() {
+  const Vm = state.params.Vrms * Math.SQRT2;
+  const a = state.params.alpha * Math.PI / 180;
+  let vdcEstimate;
+  switch (state.type) {
+    case 'half-wave-uncontrolled': vdcEstimate = Vm / Math.PI; break;
+    case 'half-wave-controlled': vdcEstimate = Vm / (2 * Math.PI) * (1 + Math.cos(a)); break;
+    case 'full-wave-uncontrolled-bridge': vdcEstimate = 2 * Vm / Math.PI; break;
+    case 'full-wave-controlled-bridge': vdcEstimate = Math.max(0, 2 * Vm / Math.PI * Math.cos(a)); break;
+    case 'semi-converter': vdcEstimate = Vm / Math.PI * (1 + Math.cos(a)); break;
+    default: vdcEstimate = Vm / Math.PI;
+  }
+  const target = Math.min(state.params.Vrms * Math.SQRT2 * 0.95, vdcEstimate * 0.85);
+  return Math.max(5, Math.round(target / 5) * 5);
 }
 
 function displayedMode(result) {
@@ -895,10 +970,15 @@ function stateAt(result, theta) {
 // ============================================================
 function loadStackSVG(x, cy, load) {
   // returns {svg, endX} drawing R (+ L, + E) in series along a horizontal run starting at x
+  // BUGFIX (req #1): a pure 'L' load has NO resistor element — it used to
+  // always draw the resistor symbol regardless of load, so a pure-L load
+  // showed a resistor it doesn't actually have. Only draw R when the load
+  // actually contains a resistor (i.e. every load except the pure-L
+  // pseudo-load).
   let cx = x, parts = '';
   parts += svgWire(cx, cy, cx + 40, cy, false);
   cx += 40;
-  parts += svgResistor(cx + 20, cy, 40, true); cx += 40;
+  if (load !== 'L') { parts += svgResistor(cx + 20, cy, 40, true); cx += 40; }
   if (load.indexOf('L') !== -1 && load !== 'R') { parts += svgWire(cx, cy, cx + 15, cy, false); cx += 15; parts += svgInductor(cx + 22, cy, 44, true); cx += 44; }
   if (load.indexOf('E') !== -1) { parts += svgWire(cx, cy, cx + 15, cy, false); cx += 15; parts += svgBattery(cx + 10, cy, 20, true); cx += 20; }
   parts += svgWire(cx, cy, cx + 30, cy, false); cx += 30;
@@ -936,47 +1016,76 @@ function renderCircuit(result, theta) {
     svg += `<text x="${W / 2}" y="${H - 14}" text-anchor="middle" fill="#94a3b8" font-size="10">${mainOn ? (topo.poleLabels[0] + ' conducting') : (fwdOn ? topo.fwdLabel + ' freewheeling' : 'blocking (OFF)')}</text>`;
 
   } else if (topo.nPoles === 2) {
-    H = 340;
+    // BUGFIX (req #4 / #8): this used to draw only ONE merged symbol per
+    // pole (e.g. a single box labeled "D1,D2"), with just one wire out of
+    // the AC source — not an actual bridge. Redrawn as a real two-leg
+    // bridge: the single AC source's two terminals feed leg A (left) and
+    // leg B (right); each leg has its own top and bottom device. Device
+    // labels are derived straight from topo.poleLabels, so this works
+    // unmodified for the uncontrolled bridge (D1..D4), the controlled
+    // bridge (T1..T4) AND the semi-converter's mixed SCR/diode legs
+    // (T1,D1 / T2,D2) — matching the requested layout: left column is the
+    // pole-0/pole-1 pair whose FIRST label lands top-left, right column is
+    // the pair whose SECOND label lands there, i.e. left=(D1 top, D4
+    // bottom), right=(D3 top, D2 bottom).
     const mainOn = s.branch === 'MAIN', fwdOn = s.branch === 'FWD';
     const idx = s.sel ? s.sel.index : 0;
-    const devFn = (x, y, vert, on, label) => topo.isControlled ? svgSCR(x, y, 32, vert, on, label, false) : svgDiode(x, y, 32, vert, on, label);
-    const topY = 70, botY = 270, midY = 170, srcX = 70, lNodeX = 150, devX = 230, rNodeX = 320;
+    const [p0Top, p0Bot] = topo.poleLabels[0].split(',');
+    const [p1Top, p1Bot] = topo.poleLabels[1].split(',');
+    // leg A (left): top device fires on pole 0, bottom device fires on pole 1
+    // leg B (right): top device fires on pole 1, bottom device fires on pole 0
+    const legATopLbl = p0Top, legABotLbl = p1Bot, legBTopLbl = p1Top, legBBotLbl = p0Bot;
+    const devFn = (x, y, on, label, reversed) => (label[0] === 'T')
+      ? svgSCR(x, y, 30, false, on, label, false, reversed)
+      : svgDiode(x, y, 30, false, on, label, reversed);
 
-    svg += svgACSource(srcX, midY, 34);
-    // left node connects to both top-left and bottom-left devices
-    svg += svgWire(srcX + 34, midY, lNodeX, midY, true);
-    svg += svgDot(lNodeX, midY);
-    svg += svgWire(lNodeX, midY, lNodeX, topY, mainOn && idx === 0);
-    svg += svgWire(lNodeX, topY, devX - 16, topY, mainOn && idx === 0);
-    svg += devFn(devX, topY, false, mainOn && idx === 0, topo.poleLabels[0]);
-    svg += svgWire(devX + 16, topY, rNodeX, topY, mainOn && idx === 0);
+    const offset = 55;
+    const legAy = 110, legBy = 300;
+    const topYA = legAy - offset, botYA = legAy + offset, topYB = legBy - offset, botYB = legBy + offset;
+    const railTopY = 20, railBotY = botYB + 48 + 30;
+    H = railBotY + 40;
+    const srcCx = 55, srcCy = (legAy + legBy) / 2, phaseX = 170, devX = 210, railX = 300;
 
-    svg += svgWire(lNodeX, midY, lNodeX, botY, mainOn && idx === 1);
-    svg += svgWire(lNodeX, botY, devX - 16, botY, mainOn && idx === 1);
-    svg += devFn(devX, botY, false, mainOn && idx === 1, topo.poleLabels[1]);
-    svg += svgWire(devX + 16, botY, rNodeX, botY, mainOn && idx === 1);
+    svg += svgACSource(srcCx, srcCy, 32);
+    // two separate leads off the ONE source — top lead feeds leg A, bottom
+    // lead feeds leg B — instead of a single shared wire pretending both
+    // legs come off the same terminal.
+    svg += svgWire(srcCx, srcCy - 32, srcCx, legAy, true);
+    svg += svgWire(srcCx, legAy, phaseX, legAy, true);
+    svg += svgWire(srcCx, srcCy + 32, srcCx, legBy, true);
+    svg += svgWire(srcCx, legBy, phaseX, legBy, true);
 
-    svg += svgDot(rNodeX, topY); svg += svgDot(rNodeX, botY);
-    svg += svgWire(rNodeX, topY, rNodeX, botY, mainOn);
+    [[legAy, topYA, botYA, legATopLbl, legABotLbl, idx === 0, idx === 1],
+     [legBy, topYB, botYB, legBTopLbl, legBBotLbl, idx === 1, idx === 0]].forEach(
+      ([y, topY, botY, topLbl, botLbl, topOn, botOn]) => {
+        const onTop = mainOn && topOn, onBot = mainOn && botOn;
+        svg += svgWire(phaseX, y, phaseX, topY, onTop);
+        svg += devFn(devX, topY, onTop, topLbl, false);
+        svg += svgWire(devX + 30, topY, railX, topY, onTop);
+        svg += svgWire(railX, topY, railX, railTopY, onTop);
+        svg += svgWire(phaseX, y, phaseX, botY, onBot);
+        svg += devFn(devX, botY, onBot, botLbl, true);
+        svg += svgWire(devX + 30, botY, railX, botY, onBot);
+        svg += svgWire(railX, botY, railX, railBotY, onBot);
+      });
 
-    // output taken from rNodeX,topY (+) through load, returning to rNodeX,botY (-)
-    const outY = topY;
-    svg += svgWire(rNodeX, outY, rNodeX + 50, outY, mainOn);
-    const ld = loadStackSVG(rNodeX + 50, outY, load);
+    svg += svgDot(railX, railTopY); svg += svgDot(railX, railBotY);
+    svg += svgWire(railX, railTopY, 350, railTopY, mainOn);
+    const ld = loadStackSVG(350, railTopY, load);
     svg += ld.svg;
-    const returnX = ld.endX + 10;
-    svg += svgWire(ld.endX, outY, returnX, outY, mainOn);
-    svg += svgWire(returnX, outY, returnX, botY, mainOn);
-    svg += svgWire(returnX, botY, rNodeX, botY, true);
+    const returnX = ld.endX + 14;
+    svg += svgWire(ld.endX, railTopY, returnX, railTopY, mainOn);
+    svg += svgWire(returnX, railTopY, returnX, railBotY, mainOn);
+    svg += svgWire(returnX, railBotY, railX, railBotY, true);
 
     if (topo.hasFWD) {
-      const fx = rNodeX + 20;
-      svg += svgWire(fx, topY, fx, topY + 40, fwdOn);
-      svg += svgDiode(fx, topY + 60, 34, true, fwdOn, topo.fwdLabel);
-      svg += svgWire(fx, topY + 78, fx, botY, fwdOn);
+      const fx = 325;
+      svg += svgWire(fx, railTopY, fx, railTopY + 40, fwdOn);
+      svg += svgDiode(fx, railTopY + 60, 34, true, fwdOn, topo.fwdLabel);
+      svg += svgWire(fx, railTopY + 78, fx, railBotY, fwdOn);
     }
 
-    W = Math.max(680, returnX + 80);
+    W = Math.max(680, returnX + 60);
     svg += `<text x="${W / 2}" y="${H - 14}" text-anchor="middle" fill="#94a3b8" font-size="10">${mainOn ? (result.devLabel[s.idx] + ' conducting') : (fwdOn ? topo.fwdLabel + ' freewheeling' : 'blocking (OFF)')}</text>`;
 
   } else if (topo.threePhase && !topo.isBridge6) {
@@ -1055,6 +1164,29 @@ function renderCircuit(result, theta) {
 // ============================================================
 const SIGNAL_COLORS = { vs: '#38bdf8', vo: '#34d399', io: '#f472b6', is: '#fbbf24', vT: '#a78bfa', ig: '#f87171' };
 const SIGNAL_LABELS = { vs: 'v_s', vo: 'v_o', io: 'i_o', is: 'i_s', vT: 'v_T', ig: 'gate' };
+// Composite signals (req #5 / #6): "merge them in graph" — i_a,i_b,i_c and
+// v_D1,D2,D3 each render as ONE chart panel with three overlaid traces,
+// rather than three separate panels.
+const MULTI_SIGNAL_DEFS = {
+  iabc: [{ key: 'ia', label: 'i_a', color: '#f43f5e' }, { key: 'ib', label: 'i_b', color: '#22d3ee' }, { key: 'ic', label: 'i_c', color: '#34d399' }],
+  vDabc: [{ key: 'vD1', label: 'v_D1', color: '#f43f5e' }, { key: 'vD2', label: 'v_D2', color: '#22d3ee' }, { key: 'vD3', label: 'v_D3', color: '#34d399' }],
+};
+
+// Show/hide the i_a,i_b,i_c and v_D1,2,3 signal toggles (req #5 / #6) —
+// only meaningful for 3-phase topologies, and v_D1,2,3 only for the
+// 3-device half-wave topology (the bridge doesn't have a single blocking
+// device per phase in the same sense). Auto-unchecks a toggle that becomes
+// hidden so a stale selection can't silently keep plotting.
+function updateThreePhaseSignalVisibility(topo) {
+  const iabcWrap = $('signal-wrap-iabc'), vDabcWrap = $('signal-wrap-vDabc');
+  if (!iabcWrap || !vDabcWrap) return;
+  const showIabc = !!topo.threePhase;
+  const showVDabc = !!(topo.threePhase && !topo.isBridge6);
+  iabcWrap.classList.toggle('hidden', !showIabc);
+  vDabcWrap.classList.toggle('hidden', !showVDabc);
+  if (!showIabc) { const cb = iabcWrap.querySelector('input'); if (cb) cb.checked = false; }
+  if (!showVDabc) { const cb = vDabcWrap.querySelector('input'); if (cb) cb.checked = false; }
+}
 
 function activeSignals() {
   return Array.from(document.querySelectorAll('.signal-toggle')).filter(cb => cb.checked).map(cb => cb.dataset.signal);
@@ -1115,6 +1247,26 @@ function buildChartSVG(theta, series, opts) {
         const x = xScale(pos);
         svg += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${padT + plotH}" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3,3" opacity="0.55"/>`;
       }
+    }
+  }
+  // BUGFIX (req #3): shade discontinuous-conduction (blocking/OFF) dead
+  // bands directly on the chart so DCM is visually obvious at a glance —
+  // instead of DCM and CCM waveforms looking identical unless you already
+  // know what to look for. CCM traces simply have no shaded bands at all.
+  if (opts.branch) {
+    let segStart = null;
+    for (let k = 0; k < theta.length; k++) {
+      const isOff = opts.branch[k] === 'OFF';
+      if (isOff && segStart === null) segStart = k;
+      if (!isOff && segStart !== null) {
+        const x0 = xScale(theta[segStart]), x1 = xScale(theta[k]);
+        svg += `<rect x="${x0.toFixed(1)}" y="${padT}" width="${Math.max(0, x1 - x0).toFixed(1)}" height="${plotH}" fill="#f59e0b" opacity="0.10"/>`;
+        segStart = null;
+      }
+    }
+    if (segStart !== null) {
+      const x0 = xScale(theta[segStart]), x1 = xScale(theta[theta.length - 1]);
+      svg += `<rect x="${x0.toFixed(1)}" y="${padT}" width="${Math.max(0, x1 - x0).toFixed(1)}" height="${plotH}" fill="#f59e0b" opacity="0.10"/>`;
     }
   }
   svg += `<line x1="${padL}" y1="${yMid}" x2="${padL + plotW}" y2="${yMid}" stroke="rgba(255,255,255,0.14)" stroke-width="1"/>`;
@@ -1204,7 +1356,7 @@ function chartPanelHTML(title, svg) {
   return `<div class="chart-panel"><div class="chart-panel-title">${title}</div>${svg}</div>`;
 }
 
-const CHART_TITLES = { vs: 'Source Voltage — v_s', vo: 'Output Voltage — v_o', io: 'Load Current — i_o', is: 'Source Current — i_s', vT: 'Device Voltage — v_T' };
+const CHART_TITLES = { vs: 'Source Voltage — v_s', vo: 'Output Voltage — v_o', io: 'Load Current — i_o', is: 'Source Current — i_s', vT: 'Device Voltage — v_T', iabc: 'Phase Currents — i_a, i_b, i_c', vDabc: 'Device Blocking Voltages — v_D1, v_D2, v_D3' };
 
 function renderWaveforms(result) {
   const theta = result.theta;
@@ -1220,8 +1372,14 @@ function renderWaveforms(result) {
 
   dataSigs.forEach((s, i) => {
     const isLast = !showGate && i === dataSigs.length - 1;
-    const series = [{ label: SIGNAL_LABELS[s], color: SIGNAL_COLORS[s], values: result[s] }];
-    const { svg, meta } = buildChartSVG(theta, series, { H: 170, alphaRad, alphaPeriod, showXLabels: isLast });
+    // Composite (merged multi-trace) signals — req #5 / #6.
+    const series = MULTI_SIGNAL_DEFS[s]
+      ? MULTI_SIGNAL_DEFS[s].map(def => ({ label: def.label, color: def.color, values: result[def.key] }))
+      : [{ label: SIGNAL_LABELS[s], color: SIGNAL_COLORS[s], values: result[s] }];
+    // Shade DCM dead-bands on vo/io (req #3) — the panels where a genuine
+    // discontinuous-conduction flat zone is meaningful to see.
+    const branchForShading = (s === 'vo' || s === 'io') ? result.branch : null;
+    const { svg, meta } = buildChartSVG(theta, series, { H: 170, alphaRad, alphaPeriod, showXLabels: isLast, branch: branchForShading });
     html += chartPanelHTML(CHART_TITLES[s], svg);
     lastMeta = meta;
   });
@@ -1575,6 +1733,7 @@ function renderDualConverter() {
   harmonicsContainer.parentElement.classList.add('hidden');
   fwdWrap.classList.add('hidden');
   $('source-panel-wrap').classList.add('hidden');
+  $('signals-toolbar').classList.add('hidden');
 
   const alpha1 = state.params.alpha;
   const alpha1Rad = alpha1 * Math.PI / 180;
@@ -1686,6 +1845,7 @@ function renderMotorDrive() {
   harmonicsContainer.parentElement.classList.add('hidden');
   fwdWrap.classList.add('hidden');
   $('source-panel-wrap').classList.add('hidden');
+  $('signals-toolbar').classList.add('hidden');
 
   paramPanel.innerHTML =
     motorRow('alpha', 'α', 0, 179, 1, '°') + motorRow('Ra', 'R<sub>a</sub>', 0.5, 10, 0.5, 'Ω') +
@@ -1826,7 +1986,15 @@ function wireGlobalEvents() {
   document.addEventListener('change', (e) => {
     if (e.target.classList.contains('signal-toggle')) {
       updateGateSpanVisibility();
-      if (currentResult) { renderWaveforms(currentResult); updateZoomSizer(); }
+      // BUGFIX (req #7): these per-signal checkboxes only apply to the
+      // standard-converter waveform panels. On Dual Converter / Motor
+      // Drive, `currentResult` is just a leftover from whichever standard
+      // converter was viewed last (or null) — calling renderWaveforms()
+      // with it here used to silently blow away that page's own diagram
+      // with unrelated stale waveform charts. Only re-render when a
+      // standard converter is actually the active page.
+      const isStandardPage = state.category !== 'dual-converter' && state.category !== 'motor-drive';
+      if (isStandardPage && currentResult) { renderWaveforms(currentResult); updateZoomSizer(); }
     }
   });
   updateGateSpanVisibility();
