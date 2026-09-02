@@ -130,6 +130,7 @@ body {
 
     <div class="glass rounded-2xl p-4">
       <div class="flex flex-wrap gap-3 mb-1 items-center" id="signals-toolbar">
+        <div class="flex flex-wrap gap-3 items-center" id="signal-checkboxes">
         <span class="param-label mr-1">Signals:</span>
         <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="signal-toggle" data-signal="vs" checked> v<sub>s</sub></label>
         <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="signal-toggle" data-signal="vo" checked> v<sub>o</sub></label>
@@ -143,6 +144,7 @@ body {
           <span class="text-[10px] text-slate-500 uppercase tracking-wide">Pulse width</span>
           <input type="range" class="param-slider w-16" id="slider-gate-span" min="1" max="60" step="1" value="8">
           <span class="param-value mono" id="val-gate-span">8°</span>
+        </div>
         </div>
         <div class="ml-auto flex items-center gap-2">
           <button class="icon-btn" id="btn-export-png" title="Download every waveform panel (incl. source & gate) as one PNG">⬇ PNG</button>
@@ -632,7 +634,7 @@ function effectiveLoad() {
 function renderStandardConverter() {
   pageTitle.textContent = TYPE_LABELS[state.type] || state.type;
   pageSubtitle.textContent = state.load + (FWD_ELIGIBLE[state.type] && state.hasFWD ? ' + FWD' : '');
-  $('signals-toolbar').classList.remove('hidden');
+  $('signal-checkboxes').classList.remove('hidden');
   renderParamPanel();
 
   const p = Object.assign({}, state.params);
@@ -1113,43 +1115,57 @@ function renderCircuit(result, theta) {
     svg += `<text x="${W / 2}" y="${H - 14}" text-anchor="middle" fill="#94a3b8" font-size="10">Conducting: ${s.branch === 'MAIN' ? topo.poleLabels[idx] : 'none'} · N (neutral) return</text>`;
 
   } else if (topo.isBridge6) {
-    // Generous spacing so devices never collide: an SCR's on-screen envelope
-    // spans roughly 26px above its center (label) to 48px below (gate lead +
-    // "G" label), i.e. ~74px tall. With a 55px offset from the phase line and
-    // a 210px gap between phase rows, adjacent devices (e.g. phase-0's bottom
-    // device vs. phase-1's top device) still keep a ~26px clear margin.
-    const offset = 55, rowGap = 210;
-    const ys = [100, 100 + rowGap, 100 + 2 * rowGap]; // [100, 310, 520]
-    const railTopY = 30, railBotY = ys[2] + offset + 48 + 30; // clears the last device's gate label
+    // REDESIGNED (per reference image): the previous layout clustered each
+    // phase's own top+bottom device right next to its own source ("row"
+    // layout). The reference circuit instead stacks all 3 sources on the
+    // left with ia/ib/ic leads, and lays the 6 devices out as a 3-column ×
+    // 2-row GRID — D1,D3,D5 all in one shared top row, D4,D6,D2 all in one
+    // shared bottom row — with a single +rail/−rail bus running across all
+    // three columns. Same electrical topology, matching visual layout.
+    const colXs = [230, 330, 430]; // one column per phase, left→right = a,b,c
+    const devXs = colXs.map(x => x + 40);
+    const topY = 90, botY = 340;
+    const railTopY = 30, railBotY = botY + 48 + 30; // clears the last device's gate label
     H = railBotY + 40;
+    const srcYs = [130, 185, 240]; // staircased source heights, like the reference
+    const srcX = 55, srcR = 22;
     const topIdx = s.sel ? s.sel.topIndex : 0, botIdx = s.sel ? s.sel.bottomIndex : 0;
-    ys.forEach((y, k) => {
-      const topY = y - offset, botY = y + offset;
-      svg += svgACSource(55, y, 26);
-      svg += svgWire(81, y, 170, y, s.branch === 'MAIN' && (topIdx === k || botIdx === k));
+    const phaseLabels = ['i_a', 'i_b', 'i_c'];
+
+    colXs.forEach((colX, k) => {
+      const y = srcYs[k], devX = devXs[k];
       const onTop = s.branch === 'MAIN' && topIdx === k;
       const onBot = s.branch === 'MAIN' && botIdx === k;
+      const onEither = onTop || onBot;
+      svg += svgACSource(srcX, y, srcR);
+      svg += svgWire(srcX + srcR, y, colX, y, onEither);
+      svg += `<text x="${(srcX + srcR + colX) / 2}" y="${y - 8}" text-anchor="middle" fill="#64748b" font-size="10">${phaseLabels[k]}</text>`;
+      svg += svgDot(colX, y);
       // Top (common-cathode) group: anode faces the phase line, cathode faces +rail.
-      svg += svgWire(170, y, 170, topY, onTop);
-      svg += (topo.isControlled ? svgSCR(210, topY, 30, false, onTop, topo.topLbl[k], false, false) : svgDiode(210, topY, 30, false, onTop, topo.topLbl[k], false));
-      svg += svgWire(240, topY, 300, topY, onTop);
-      svg += svgWire(300, topY, 300, railTopY, onTop);
+      svg += svgWire(colX, y, colX, topY, onTop);
+      svg += (topo.isControlled ? svgSCR(devX, topY, 30, false, onTop, topo.topLbl[k], false, false) : svgDiode(devX, topY, 30, false, onTop, topo.topLbl[k], false));
+      svg += svgWire(devX + 30, topY, devX + 30, railTopY, onTop);
       // Bottom (common-anode) group: reversed so the cathode faces the phase
       // line and the anode faces −rail (current flows rail → phase here).
-      svg += svgWire(170, y, 170, botY, onBot);
-      svg += (topo.isControlled ? svgSCR(210, botY, 30, false, onBot, topo.botLbl[k], false, true) : svgDiode(210, botY, 30, false, onBot, topo.botLbl[k], true));
-      svg += svgWire(240, botY, 300, botY, onBot);
-      svg += svgWire(300, botY, 300, railBotY, onBot);
+      svg += svgWire(colX, y, colX, botY, onBot);
+      svg += (topo.isControlled ? svgSCR(devX, botY, 30, false, onBot, topo.botLbl[k], false, true) : svgDiode(devX, botY, 30, false, onBot, topo.botLbl[k], true));
+      svg += svgWire(devX + 30, botY, devX + 30, railBotY, onBot);
     });
-    svg += svgDot(300, railTopY); svg += svgDot(300, railBotY);
-    svg += svgWire(300, railTopY, 350, railTopY, true);
-    const ld = loadStackSVG(350, railTopY, load);
+
+    // shared +rail / −rail bus spanning all three columns
+    const railX0 = devXs[0] + 30, railX2 = devXs[2] + 30;
+    svg += svgWire(railX0, railTopY, railX2, railTopY, s.branch === 'MAIN');
+    svg += svgWire(railX0, railBotY, railX2, railBotY, s.branch === 'MAIN');
+    colXs.forEach((_, k) => { svg += svgDot(devXs[k] + 30, railTopY); svg += svgDot(devXs[k] + 30, railBotY); });
+
+    svg += svgWire(railX2, railTopY, railX2 + 50, railTopY, true);
+    const ld = loadStackSVG(railX2 + 50, railTopY, load);
     svg += ld.svg;
     const returnX = ld.endX + 14;
     svg += svgWire(ld.endX, railTopY, returnX, railTopY, true);
     svg += svgWire(returnX, railTopY, returnX, railBotY, true);
-    svg += svgWire(returnX, railBotY, 300, railBotY, true);
-    W = Math.max(680, returnX + 60);
+    svg += svgWire(returnX, railBotY, railX2, railBotY, true);
+    W = Math.max(720, returnX + 60);
     svg += `<text x="${W / 2}" y="${H - 14}" text-anchor="middle" fill="#94a3b8" font-size="10">Conducting: ${s.branch === 'MAIN' ? (topo.topLbl[topIdx] + ' + ' + topo.botLbl[botIdx]) : 'none'}</text>`;
   }
 
@@ -1733,7 +1749,10 @@ function renderDualConverter() {
   harmonicsContainer.parentElement.classList.add('hidden');
   fwdWrap.classList.add('hidden');
   $('source-panel-wrap').classList.add('hidden');
-  $('signals-toolbar').classList.add('hidden');
+  // NOTE: left the vs/vo/io/... signal checkboxes visible (not hidden) here
+  // — an earlier attempt to hide them on this page, since they don't drive
+  // this page's own diagram, turned out to also hide controls the user
+  // relies on seeing. Matching the original app's behavior: always visible.
 
   const alpha1 = state.params.alpha;
   const alpha1Rad = alpha1 * Math.PI / 180;
@@ -1824,6 +1843,10 @@ function renderDualConverter() {
       <li>At α₁=90°, both converters produce Vdc≈0 — the natural transition point.</li>
     </ul></div>`;
   updateStatus({ mode: 'CCM', metrics: { Vdc: Vdc1 } });
+  // This page's own sliders call renderDualConverter() directly (not
+  // through the shared render() dispatcher), so it has to resync the
+  // zoom sizer itself on every redraw too, not just on first navigation.
+  updateZoomSizer();
 }
 
 // ============================================================
@@ -1845,7 +1868,8 @@ function renderMotorDrive() {
   harmonicsContainer.parentElement.classList.add('hidden');
   fwdWrap.classList.add('hidden');
   $('source-panel-wrap').classList.add('hidden');
-  $('signals-toolbar').classList.add('hidden');
+  // NOTE: restored — hiding these here removed controls the user was
+  // actually using on this page. Left visible, matching the original app.
 
   paramPanel.innerHTML =
     motorRow('alpha', 'α', 0, 179, 1, '°') + motorRow('Ra', 'R<sub>a</sub>', 0.5, 10, 0.5, 'Ω') +
@@ -1969,6 +1993,9 @@ function renderMotorDrive() {
     <div><b class="text-slate-100">Key equations:</b> <span class="mono text-cyan-300">V_a = E_g + I_aR_a + L_a dI_a/dt,  E_g=K_eω,  T_e=K_tI_a,  J dω/dt = T_e - T_L - Bω</span></div>
     <div><b class="text-slate-100">Observe:</b><ul class="list-disc pl-5">${modeText.obs.map(o => `<li>${o}</li>`).join('')}</ul></div>`;
   updateStatus({ mode: 'CCM', metrics: { Vdc: VaAvg } });
+  // Same reasoning as renderDualConverter(): this page's own sliders call
+  // renderMotorDrive() directly, so it must resync the zoom sizer itself.
+  updateZoomSizer();
 }
 
 // ============================================================
