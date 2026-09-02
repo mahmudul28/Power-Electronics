@@ -1384,6 +1384,18 @@ function chartPanelHTML(title, svg) {
 const CHART_TITLES = { vs: 'Source Voltage — v_s', vo: 'Output Voltage — v_o', io: 'Load Current — i_o', is: 'Source Current — i_s', vT: 'Device Voltage — v_T', iabc: 'Phase Currents — i_a, i_b, i_c', vDabc: 'Device Blocking Voltages — v_D1, v_D2, v_D3' };
 
 function renderWaveforms(result) {
+  // GUARD (fix at the source): renderWaveforms() draws the standard-converter
+  // waveform panels only. Dual Converter / Motor Drive render their own SVGs
+  // directly and don't use this function at all — but several unrelated
+  // controls (signal-toggle checkboxes, the gate-pulse-span slider, etc.)
+  // call renderWaveforms(currentResult) whenever currentResult is non-null,
+  // and currentResult is just a leftover from whichever standard converter
+  // was viewed last. Without this guard, nudging any of those controls while
+  // on Dual Converter/Motor Drive silently overwrites that page's real
+  // diagram with a stale, unrelated chart. Checking here — instead of at
+  // every call site — means no future call site can reintroduce this bug.
+  if (state.category === 'dual-converter' || state.category === 'motor-drive') return;
+  if (!result) return;
   const theta = result.theta;
   const sigs = activeSignals();
   const showGate = sigs.indexOf('ig') !== -1;
@@ -2037,6 +2049,9 @@ function wireGlobalEvents() {
   $('slider-gate-span').addEventListener('input', (e) => {
     state.gatePulseSpanDeg = parseFloat(e.target.value);
     $('val-gate-span').textContent = state.gatePulseSpanDeg + '°';
+    // renderWaveforms() now guards itself against being called on
+    // Dual Converter / Motor Drive (see its definition), so this call is
+    // safe on every page — it's simply a no-op there.
     if (currentResult) { renderWaveforms(currentResult); updateZoomSizer(); }
   });
   $('btn-play').addEventListener('click', () => { state.playing ? stopAnimation() : startAnimation(); });
