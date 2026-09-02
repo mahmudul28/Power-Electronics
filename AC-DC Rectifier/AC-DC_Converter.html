@@ -155,6 +155,14 @@ body {
           <span class="param-value mono" id="val-gate-span">8°</span>
         </div>
         </div>
+        <div class="flex flex-wrap gap-3 items-center hidden" id="motor-signal-checkboxes">
+        <span class="param-label mr-1">Signals:</span>
+        <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="motor-signal-toggle" data-msignal="Va" checked> v<sub>a</sub></label>
+        <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="motor-signal-toggle" data-msignal="Eg"> e<sub>g</sub></label>
+        <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="motor-signal-toggle" data-msignal="Ia" checked> i<sub>a</sub></label>
+        <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="motor-signal-toggle" data-msignal="Te"> T<sub>e</sub></label>
+        <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="motor-signal-toggle" data-msignal="Wm"> ω<sub>m</sub></label>
+        </div>
         <div class="ml-auto flex items-center gap-2">
           <button class="icon-btn" id="btn-export-png" title="Download every waveform panel (incl. source & gate) as one PNG">⬇ PNG</button>
           <button class="icon-btn" id="btn-reset">⟲ Reset</button>
@@ -644,6 +652,7 @@ function renderStandardConverter() {
   pageTitle.textContent = TYPE_LABELS[state.type] || state.type;
   pageSubtitle.textContent = state.load + (FWD_ELIGIBLE[state.type] && state.hasFWD ? ' + FWD' : '');
   $('signal-checkboxes').classList.remove('hidden');
+  $('motor-signal-checkboxes').classList.add('hidden');
   renderParamPanel();
 
   const p = Object.assign({}, state.params);
@@ -1384,18 +1393,6 @@ function chartPanelHTML(title, svg) {
 const CHART_TITLES = { vs: 'Source Voltage — v_s', vo: 'Output Voltage — v_o', io: 'Load Current — i_o', is: 'Source Current — i_s', vT: 'Device Voltage — v_T', iabc: 'Phase Currents — i_a, i_b, i_c', vDabc: 'Device Blocking Voltages — v_D1, v_D2, v_D3' };
 
 function renderWaveforms(result) {
-  // GUARD (fix at the source): renderWaveforms() draws the standard-converter
-  // waveform panels only. Dual Converter / Motor Drive render their own SVGs
-  // directly and don't use this function at all — but several unrelated
-  // controls (signal-toggle checkboxes, the gate-pulse-span slider, etc.)
-  // call renderWaveforms(currentResult) whenever currentResult is non-null,
-  // and currentResult is just a leftover from whichever standard converter
-  // was viewed last. Without this guard, nudging any of those controls while
-  // on Dual Converter/Motor Drive silently overwrites that page's real
-  // diagram with a stale, unrelated chart. Checking here — instead of at
-  // every call site — means no future call site can reintroduce this bug.
-  if (state.category === 'dual-converter' || state.category === 'motor-drive') return;
-  if (!result) return;
   const theta = result.theta;
   const sigs = activeSignals();
   const showGate = sigs.indexOf('ig') !== -1;
@@ -1739,7 +1736,7 @@ function animFrame(ts) {
   requestAnimationFrame(animFrame);
 }
 function startAnimation() {
-  if (state.playing) return;
+  if (state.playing || !currentResult) return;
   state.playing = true;
   state.lastFrameTs = null;
   $('btn-play').textContent = '⏸ Pause';
@@ -1770,6 +1767,23 @@ function renderDualConverter() {
   harmonicsContainer.parentElement.classList.add('hidden');
   fwdWrap.classList.add('hidden');
   $('source-panel-wrap').classList.add('hidden');
+  $('motor-signal-checkboxes').classList.add('hidden');
+  $('signal-checkboxes').classList.remove('hidden'); // in case we arrived here from Motor Drive, which hides it
+  // ROOT-CAUSE FIX: this page's own diagram doesn't come from
+  // simulateConverter()/currentResult at all — it builds its own SVG below.
+  // But several OTHER handlers (pulse-width slider, animation loop, cursor
+  // hover, mode-badge click, ...) all guard themselves with just
+  // "if (currentResult)" and then blindly re-render standard-converter
+  // waveform/status/metrics content using it. If currentResult was left
+  // over from whichever standard converter was viewed before navigating
+  // here, ANY of those unrelated interactions would silently overwrite
+  // this page's real diagram with stale, wrong charts — which is exactly
+  // what made it look like "the graph only appears after nudging the
+  // pulse width". Clearing it here (the single source of truth for
+  // "is a standard-converter result currently valid") makes every one of
+  // those checks correctly no-op on this page, instead of having to
+  // remember to special-case each call site individually.
+  currentResult = null;
   // NOTE: left the vs/vo/io/... signal checkboxes visible (not hidden) here
   // — an earlier attempt to hide them on this page, since they don't drive
   // this page's own diagram, turned out to also hide controls the user
@@ -1889,8 +1903,19 @@ function renderMotorDrive() {
   harmonicsContainer.parentElement.classList.add('hidden');
   fwdWrap.classList.add('hidden');
   $('source-panel-wrap').classList.add('hidden');
-  // NOTE: restored — hiding these here removed controls the user was
-  // actually using on this page. Left visible, matching the original app.
+  // FIX: the generic vs/vo/io/... checkboxes don't apply to this page (it
+  // doesn't plot those quantities at all) and were never actually wired to
+  // anything here — they just sat there looking like they should do
+  // something. Swap in this page's own, functional set (v_a/e_g/i_a/T_e/ω_m)
+  // instead of leaving dead controls visible.
+  $('signal-checkboxes').classList.add('hidden');
+  $('motor-signal-checkboxes').classList.remove('hidden');
+  // ROOT-CAUSE FIX — same reasoning as renderDualConverter(): this page
+  // builds its own SVG below, not from currentResult. Clearing it here
+  // stops other handlers (pulse-width slider, animation loop, cursor
+  // hover, mode-badge click) from using a stale standard-converter result
+  // to silently overwrite this page's own chart.
+  currentResult = null;
 
   paramPanel.innerHTML =
     motorRow('alpha', 'α', 0, 179, 1, '°') + motorRow('Ra', 'R<sub>a</sub>', 0.5, 10, 0.5, 'Ω') +
@@ -1946,25 +1971,38 @@ function renderMotorDrive() {
     }
   }
 
-  // waveform plot (custom, reusing SVG plot style)
-  const W = 900, H = 320, padL = 46, padR = 20, padT = 14, padB = 30, plotW = W - padL - padR, plotH = H - padT - padB;
-  const thetaMin = theta[0], thetaMax = theta[N - 1];
-  const xScale = th => padL + (th - thetaMin) / (thetaMax - thetaMin) * plotW;
-  let vMax = 1, iMax = 1;
-  for (let k = 0; k < N; k++) { vMax = Math.max(vMax, Math.abs(Va[k]), Math.abs(Eg[k])); iMax = Math.max(iMax, Math.abs(Ia[k])); }
-  vMax *= 1.2; iMax *= 1.3;
-  const yMid = padT + plotH / 2;
-  const yV = v => yMid - (v / vMax) * (plotH / 2);
-  const yI = v => yMid - (v / iMax) * (plotH / 2);
-  function path(arr, ys) { let d = ''; for (let k = 0; k < N; k++) d += (k === 0 ? 'M' : 'L') + xScale(theta[k]).toFixed(1) + ' ' + ys(arr[k]).toFixed(1) + ' '; return d; }
-  let svg = `<svg viewBox="0 0 ${W} ${H}">`;
-  svg += `<line x1="${padL}" y1="${yMid}" x2="${padL + plotW}" y2="${yMid}" stroke="rgba(255,255,255,.12)"/>`;
-  svg += `<path d="${path(Va, yV)}" stroke="#38bdf8" fill="none" stroke-width="1.6"/>`;
-  svg += `<path d="${path(Eg, yV)}" stroke="#34d399" fill="none" stroke-width="1.6"/>`;
-  svg += `<path d="${path(Ia, yI)}" stroke="#fbbf24" fill="none" stroke-width="1.8"/>`;
-  svg += `<text x="${padL}" y="12" fill="#38bdf8" font-size="10">Va</text><text x="${padL + 30}" y="12" fill="#34d399" font-size="10">Eg</text><text x="${padL + 58}" y="12" fill="#fbbf24" font-size="10">Ia</text>`;
-  svg += '</svg>';
-  waveformWrapper.innerHTML = svg; waveformWrapper._meta = null;
+  // Separate chart panels (req: don't cram unrelated signals — Va (hundreds
+  // of volts), Eg (volts), Ia (tens of amps) — onto one shared axis; that
+  // forces a compressed, hard-to-read scale and looks like the traces are
+  // tangled/merged into each other. Reuse the same buildChartSVG/
+  // chartPanelHTML panels the standard-converter pages use, so each signal
+  // gets its own correctly-scaled axis and this page looks consistent with
+  // the rest of the app instead of a one-off cramped combo chart.
+  const motorSeriesDefs = [
+    { key: 'Va', label: 'v_a (armature voltage)', color: '#38bdf8', title: 'Armature Voltage — v_a' },
+    { key: 'Eg', label: 'e_g (back-EMF)', color: '#34d399', title: 'Back-EMF — e_g' },
+    { key: 'Ia', label: 'i_a (armature current)', color: '#fbbf24', title: 'Armature Current — i_a' },
+    { key: 'Te', label: 'T_e (electromagnetic torque)', color: '#f472b6', title: 'Torque — T_e' },
+    { key: 'Wm', label: 'ω_m (mechanical speed)', color: '#a78bfa', title: 'Speed — ω_m' },
+  ];
+  const motorData = { Va, Eg, Ia, Te, Wm };
+  // Only plot the panels the motor-signal checkboxes actually have checked
+  // (mirrors activeSignals() on the standard-converter pages) — this is
+  // what makes the checkboxes a real control instead of dead UI.
+  const checkedMSignals = Array.from(document.querySelectorAll('.motor-signal-toggle:checked')).map(cb => cb.dataset.msignal);
+  const activeDefs = motorSeriesDefs.filter(def => checkedMSignals.indexOf(def.key) !== -1);
+  let html = '';
+  if (!activeDefs.length) {
+    html = '<div class="text-sm text-slate-500 text-center py-8">Select at least one signal above to plot it.</div>';
+  } else {
+    activeDefs.forEach((def, i) => {
+      const series = [{ label: def.label, color: def.color, values: motorData[def.key] }];
+      const { svg: panelSvg } = buildChartSVG(theta, series, { H: 170, showXLabels: i === activeDefs.length - 1 });
+      html += chartPanelHTML(def.title, panelSvg);
+    });
+  }
+  waveformWrapper.innerHTML = html;
+  waveformWrapper._meta = null;
   cursorLine.style.display = 'none'; cursorReadout.style.display = 'none';
 
   const IaAvg = Ia.reduce((a, b) => a + b, 0) / N, WmAvg = Wm.reduce((a, b) => a + b, 0) / N;
@@ -2043,15 +2081,15 @@ function wireGlobalEvents() {
       // standard converter is actually the active page.
       const isStandardPage = state.category !== 'dual-converter' && state.category !== 'motor-drive';
       if (isStandardPage && currentResult) { renderWaveforms(currentResult); updateZoomSizer(); }
+    } else if (e.target.classList.contains('motor-signal-toggle') && state.category === 'motor-drive') {
+      renderMotorDrive();
+      updateZoomSizer();
     }
   });
   updateGateSpanVisibility();
   $('slider-gate-span').addEventListener('input', (e) => {
     state.gatePulseSpanDeg = parseFloat(e.target.value);
     $('val-gate-span').textContent = state.gatePulseSpanDeg + '°';
-    // renderWaveforms() now guards itself against being called on
-    // Dual Converter / Motor Drive (see its definition), so this call is
-    // safe on every page — it's simply a no-op there.
     if (currentResult) { renderWaveforms(currentResult); updateZoomSizer(); }
   });
   $('btn-play').addEventListener('click', () => { state.playing ? stopAnimation() : startAnimation(); });
@@ -2195,7 +2233,13 @@ function checkMobileWarning() {
   if (!el) return;
   const isNarrow = window.innerWidth < 760;
   const isMobileUA = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
-  if ((isNarrow || isMobileUA) && !sessionStorage.getItem('acdc-mobile-warning-dismissed')) {
+  // Defensive: sessionStorage can throw (not just return null) in sandboxed/
+  // embedded iframes with storage access restricted — that would otherwise
+  // abort init() here and silently prevent render() from ever running at
+  // all, for every page, not just this warning banner.
+  let dismissed = false;
+  try { dismissed = !!sessionStorage.getItem('acdc-mobile-warning-dismissed'); } catch (e) {}
+  if ((isNarrow || isMobileUA) && !dismissed) {
     el.classList.remove('hidden');
   }
 }
@@ -2220,6 +2264,16 @@ function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+// Diagnostic safety net: if ANYTHING throws anywhere in the app, show it
+// as a visible on-page banner instead of failing silently. A silent JS
+// exception is indistinguishable, from the outside, from "the graph just
+// isn't showing up" — this turns that into something reportable.
+window.addEventListener('error', (e) => {
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#7f1d1d;color:#fecaca;font:12px monospace;padding:10px 14px;white-space:pre-wrap;max-height:40vh;overflow:auto;border-top:2px solid #ef4444;';
+  box.textContent = 'JS error: ' + e.message + '\n' + (e.filename ? (e.filename + ':' + e.lineno + ':' + e.colno) : '') + (e.error && e.error.stack ? '\n' + e.error.stack : '');
+  document.body.appendChild(box);
+});
 
 </script>
 </body>
